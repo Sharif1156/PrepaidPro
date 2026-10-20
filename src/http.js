@@ -27,6 +27,7 @@ export async function request(url, options = {}) {
     });
     return response;
   } catch (error) {
+        console.error('[upstream]', safeHost(url), error?.cause?.code || error?.cause?.message || error?.message);
     const reason =
       error?.name === 'AbortError'
         ? 'timeout'
