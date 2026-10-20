@@ -1,0 +1,28 @@
+{
+  "name": "prepaidpro",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Open-source DESCO & NESCO prepaid electricity dashboard with balance forecasts, usage insights and low-balance alerts.",
+  "keywords": [
+    "desco",
+    "nesco",
+    "prepaid-meter",
+    "electricity",
+    "bangladesh",
+    "pwa",
+    "open-source"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check server.js && node --check src/desco.js && node --check src/nesco.js && node --check src/demo.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
