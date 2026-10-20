@@ -22,9 +22,9 @@ something you can act on: a balance forecast, a burn rate, usage trends and a
 recharge recommendation.
 
 It is a complete, runnable implementation of the open-source build described in
-the [Play Store listing]:live balance, low-balance alerts, recharge history, multiple meters, Bengali and
+the [githud open source ]:live balance, low-balance alerts, recharge history, multiple meters, Bengali and
 English, and offline support.
-
+ 
 <div align="center">
 
 | Dashboard | Usage | Insights |
