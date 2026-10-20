@@ -49,7 +49,7 @@ function load() {
     const meters = Array.isArray(raw?.meters) ? raw.meters.map(sanitizeMeter).filter(Boolean) : [];
     const settings = { ...defaultSettings, ...(raw?.settings || {}) };
     if (!['en', 'bn'].includes(settings.lang)) settings.lang = 'en';
-    if (!['dark', 'light'].includes(settings.theme)) settings.theme = 'dark';
+    if (!['dark', 'light', 'classic'].includes(settings.theme)) settings.theme = 'dark';
     return {
       meters,
       settings,
@@ -183,6 +183,66 @@ export function clearAll() {
   state.settings = { ...defaultSettings };
   state.error = null;
   listeners.forEach((listener) => listener(state));
+}
+
+/**
+ * Restore a backup produced by `exportAll()`.
+ * Merge, never overwrite: meters already on this device are kept, new ones are
+ * added, and snapshots are only filled in where none exist yet.
+ * Throws Error('INVALID_BACKUP') when the file is not a PrepaidPro export.
+ */
+export function importAll(text) {
+  let data;
+  try {
+    data = JSON.parse(String(text));
+  } catch {
+    throw new Error('INVALID_BACKUP');
+  }
+  if (!data || typeof data !== 'object' || !Array.isArray(data.meters)) {
+    throw new Error('INVALID_BACKUP');
+  }
+
+  const incoming = data.meters.map(sanitizeMeter).filter(Boolean);
+  const meters = [...state.meters];
+  let added = 0;
+  let skipped = 0;
+  for (const meter of incoming) {
+    const exists = meters.some(
+      (item) => item.provider === meter.provider && item.accountNo === meter.accountNo,
+    );
+    if (exists) {
+      skipped += 1;
+      continue;
+    }
+    // Never trust ids from a file: a clash would silently merge two meters.
+    meters.push({ ...meter, id: uid() });
+    added += 1;
+  }
+
+  const snapshots = { ...state.snapshots };
+  if (data.snapshots && typeof data.snapshots === 'object') {
+    for (const [key, value] of Object.entries(data.snapshots)) {
+      if (!/^(desco|nesco):\d+$/.test(key) || !value || typeof value !== 'object') continue;
+      if (!snapshots[key]) snapshots[key] = value;
+    }
+  }
+
+  const settings = { ...state.settings };
+  if (data.settings && typeof data.settings === 'object') {
+    if (['en', 'bn'].includes(data.settings.lang)) settings.lang = data.settings.lang;
+    if (['dark', 'light', 'classic'].includes(data.settings.theme)) settings.theme = data.settings.theme;
+    const threshold = Number(data.settings.threshold);
+    if (Number.isFinite(threshold) && threshold >= 0) settings.threshold = threshold;
+    // `notifications` is deliberately not restored: it needs this browser's permission.
+  }
+
+  setState({
+    meters,
+    snapshots,
+    settings,
+    activeMeterId: state.activeMeterId || meters[0]?.id || null,
+  });
+  return { added, skipped, total: incoming.length };
 }
 
 export function exportAll() {

@@ -131,9 +131,13 @@ function renderNav() {
                 type: 'button',
                 style: { fontSize: '13px' },
                 onclick: () => {
+                  const changed = state.activeMeterId !== meter.id;
                   setActiveMeter(meter.id);
                   closeSidebar();
                   navigate('dashboard');
+                  // Selecting a meter must also fetch that meter's balance,
+                  // otherwise the dashboard keeps showing the previous one.
+                  if (changed || !runtime.account) loadActive();
                 },
               },
               h('span', {
@@ -360,18 +364,70 @@ function notificationSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
 
+/**
+ * Show a notification. `new Notification()` throws on Android Chrome and inside
+ * installed apps; a service worker registration works everywhere, so use it first.
+ */
+async function showNotification(title, options) {
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration?.showNotification) {
+      await registration.showNotification(title, options);
+      return true;
+    }
+  } catch {
+    /* fall through to the constructor */
+  }
+  try {
+    new Notification(title, options);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function requestNotifications() {
   if (!notificationSupported()) {
     toast(t('settings.notificationsUnsupported'), '', { type: 'warn' });
     return false;
   }
-  const permission = await Notification.requestPermission();
+  if (Notification.permission === 'denied') {
+    toast(t('settings.notificationsDenied'), t('settings.notificationsDeniedHelp'), { type: 'warn', timeout: 8000 });
+    return false;
+  }
+  let permission = Notification.permission;
   if (permission !== 'granted') {
-    toast(t('alerts.permissionDenied'), '', { type: 'warn' });
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      // Very old Safari only supports the callback form.
+      permission = await new Promise((resolve) => Notification.requestPermission(resolve));
+    }
+  }
+  if (permission !== 'granted') {
+    toast(
+      t(permission === 'denied' ? 'settings.notificationsDenied' : 'alerts.permissionDenied'),
+      permission === 'denied' ? t('settings.notificationsDeniedHelp') : '',
+      { type: 'warn', timeout: 8000 },
+    );
     return false;
   }
   toast(t('settings.notificationsOn'), '');
   return true;
+}
+
+async function sendTestNotification() {
+  if (!notificationSupported() || Notification.permission !== 'granted') {
+    toast(t('settings.notificationsDenied'), t('settings.notificationsDeniedHelp'), { type: 'warn', timeout: 8000 });
+    return false;
+  }
+  const ok = await showNotification(t('settings.notificationTestTitle'), {
+    body: t('settings.notificationTestBody'),
+    icon: '/icons/icon-192.png',
+    tag: 'prepaidpro-test',
+  });
+  if (!ok) toast(t('settings.notificationsUnsupported'), '', { type: 'warn' });
+  return ok;
 }
 
 function maybeNotify(meter, account) {
@@ -392,20 +448,22 @@ function maybeNotify(meter, account) {
     amount: formatMoney(account.balance, state.settings.lang),
     days: formatDuration(forecast.daysLeft, state.settings.lang),
   });
-  try {
-    new Notification(title, { body, icon: '/icons/icon-192.png', tag: `prepaidpro-${meter.id}` });
-    updateSettings({ lastNotifiedAt: new Date().toISOString() });
-  } catch {
-    /* some browsers require a service worker; ignore */
-  }
+  showNotification(title, { body, icon: '/icons/icon-192.png', tag: `prepaidpro-${meter.id}` }).then((shown) => {
+    if (shown) updateSettings({ lastNotifiedAt: new Date().toISOString() });
+  });
 }
 
 /* --------------------------------- actions -------------------------------- */
 
 function setTheme(theme) {
   updateSettings({ theme });
-  document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]').setAttribute('content', theme === 'dark' ? '#070d15' : '#f2f6f9');
+  // "classic" is the light theme plus a style layer (grey page, white cards, blue buttons).
+  document.documentElement.dataset.theme = theme === 'classic' ? 'light' : theme;
+  if (theme === 'classic') document.documentElement.dataset.style = 'classic';
+  else delete document.documentElement.dataset.style;
+  document
+    .querySelector('meta[name="theme-color"]')
+    .setAttribute('content', theme === 'dark' ? '#070d15' : theme === 'classic' ? '#eceef1' : '#f2f6f9');
 }
 
 function setLanguage(lang) {
@@ -576,6 +634,7 @@ const ctx = {
   confirmRemoveMeter,
   setActiveMeter,
   requestNotifications,
+  sendTestNotification,
   setTheme,
   setLanguage,
   renderChrome,

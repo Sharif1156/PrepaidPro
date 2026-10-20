@@ -42,6 +42,19 @@ function tooltip(wrapper) {
   };
 }
 
+/** Runs `onDismiss` when the user taps/clicks anywhere outside `wrap`. */
+function dismissOnOutsideTap(wrap, onDismiss) {
+  const handler = (event) => {
+    if (!wrap.isConnected) {
+      // The chart was re-rendered away: stop listening.
+      document.removeEventListener('pointerdown', handler);
+      return;
+    }
+    if (!wrap.contains(event.target)) onDismiss();
+  };
+  document.addEventListener('pointerdown', handler);
+}
+
 function emptyChart(message) {
   return h(
     'div',
@@ -124,6 +137,12 @@ export function barChart({
 
   const tip = tooltip(wrap);
   const labelStep = Math.ceil(data.length / 9);
+  const resets = [];
+  let pinned = -1;
+  dismissOnOutsideTap(wrap, () => {
+    pinned = -1;
+    resets.forEach((reset) => reset());
+  });
 
   data.forEach((row, index) => {
     const x = pad.left + slot * index + (slot - barW) / 2;
@@ -152,7 +171,7 @@ export function barChart({
       fill: 'transparent',
       style: 'cursor:pointer',
     });
-    hit.addEventListener('pointerenter', () => {
+    const activate = () => {
       bar.setAttribute('fill-opacity', isAccent ? '1' : '0.4');
       const box = wrap.getBoundingClientRect();
       const scale = box.width / width;
@@ -162,10 +181,32 @@ export function barChart({
         formatTooltip ? formatTooltip(row) : formatValue(row.value),
         row.subtitle || row.label,
       );
-    });
-    hit.addEventListener('pointerleave', () => {
+    };
+    const deactivate = () => {
       bar.setAttribute('fill-opacity', isAccent ? '1' : '0.18');
       tip.hide();
+    };
+    resets.push(deactivate);
+
+    // Mouse: hover. Touch: pointerleave fires the moment the finger lifts, which
+    // used to hide the tooltip instantly, so a tap now pins it until the next tap.
+    hit.addEventListener('pointerenter', (event) => {
+      if (event.pointerType !== 'mouse') return;
+      if (pinned === -1) activate();
+    });
+    hit.addEventListener('pointerleave', (event) => {
+      if (event.pointerType !== 'mouse') return;
+      if (pinned !== index) deactivate();
+    });
+    hit.addEventListener('click', () => {
+      if (pinned === index) {
+        pinned = -1;
+        deactivate();
+        return;
+      }
+      resets.forEach((reset) => reset());
+      pinned = index;
+      activate();
     });
     svg.append(hit);
 
@@ -307,7 +348,7 @@ export function areaChart({
     height: innerH,
     fill: 'transparent',
   });
-  hit.addEventListener('pointermove', (event) => {
+  const update = (event) => {
     const box = svg.getBoundingClientRect();
     const scale = width / box.width;
     const x = (event.clientX - box.left) * scale;
@@ -327,12 +368,19 @@ export function areaChart({
       formatValue(point.value),
       point.fullLabel || point.label,
     );
-  });
-  hit.addEventListener('pointerleave', () => {
+  };
+  const clearHover = () => {
     hoverLine.setAttribute('opacity', '0');
     hoverDot.setAttribute('opacity', '0');
     tip.hide();
+  };
+  hit.addEventListener('pointermove', update);
+  // A tap has no hover: show the point on press and keep it until the next tap elsewhere.
+  hit.addEventListener('pointerdown', update);
+  hit.addEventListener('pointerleave', (event) => {
+    if (event.pointerType === 'mouse') clearHover();
   });
+  dismissOnOutsideTap(wrap, clearHover);
   svg.append(hit);
 
   wrap.append(svg);

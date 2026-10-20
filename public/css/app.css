@@ -151,10 +151,10 @@
   --surface-3: #eaf2f5;
   --border: rgba(19, 58, 74, 0.12);
   --border-strong: rgba(19, 58, 74, 0.22);
-  --text: #0b1f2a;
-  --text-soft: #23414f;
-  --muted: #5b7787;
-  --faint: #7f97a4;
+  --text: #06151d;
+  --text-soft: #13303d;
+  --muted: #3a5565;
+  --faint: #587282;
   --accent: #0f9d8c;
   --accent-2: #0891b2;
   --accent-strong: #0b7f73;
@@ -2143,3 +2143,122 @@ html[lang='bn'] .data-table .num,
 html[lang='bn'] .timeline-amount {
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------- light theme legibility ------------------------- */
+/* Same crisp, high-contrast text as the dark theme: darker tokens (above),
+   a touch more weight, and chart labels that no longer fade into white. */
+[data-theme='light'] body { font-weight: 500; }
+[data-theme='light'] .muted,
+[data-theme='light'] .faint,
+[data-theme='light'] .desc,
+[data-theme='light'] .small { font-weight: 500; }
+[data-theme='light'] .chart-wrap svg text { fill-opacity: 0.9; font-weight: 600; }
+[data-theme='light'] .chart-wrap svg line[stroke='currentColor'] { stroke-opacity: 0.22; }
+[data-theme='light'] .nav-label,
+[data-theme='light'] .mini-label { color: var(--muted); }
+[data-theme='light'] .badge { font-weight: 700; }
+[data-theme='light'] .btn { font-weight: 600; }
+[data-theme='light'] .switch .track { background: #d3e0e6; border-color: #8aa3b0; }
+[data-theme='light'] .switch .track::after { background: #4b6676; }
+[data-theme='light'] .switch input:checked + .track { background: rgba(15, 157, 140, 0.22); border-color: var(--accent); }
+[data-theme='light'] .switch input:checked + .track::after { background: var(--accent-strong); }
+
+/* Icons that are the download arrow turned upside down (import). */
+.flip-v { transform: scaleY(-1); }
+
+/* ==========================================================================
+   Classic style (Settings -> Theme -> Classic)
+   Plain grey page, white cards, flat indigo buttons, system font: the familiar
+   look of a utility customer portal. It is only a colour/shape layer on top of
+   the light theme; no logos or names from any utility are used.
+   ========================================================================== */
+[data-style='classic'] {
+  --bg: #eceef1;
+  --bg-glow: #eceef1;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eceff3;
+  --border: #dcdfe4;
+  --border-strong: #c2c8d0;
+  --text: #2b3340;
+  --text-soft: #3b4655;
+  --muted: #566272;
+  --faint: #6f7b8b;
+  --accent: #3320d9;
+  --accent-2: #4a3af0;
+  --accent-strong: #2813b8;
+  --accent-soft: rgba(51, 32, 217, 0.08);
+  --accent-ring: rgba(51, 32, 217, 0.28);
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --shadow-sm: 0 1px 2px rgba(31, 41, 55, 0.08);
+  --shadow: 0 1px 3px rgba(31, 41, 55, 0.12);
+  --shadow-lg: 0 4px 14px rgba(31, 41, 55, 0.14);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans Bengali', 'Noto Sans', sans-serif;
+}
+[data-style='classic'] body { background: var(--bg); font-weight: 400; }
+[data-style='classic'] .card,
+[data-style='classic'] .sidebar { background: #fff; box-shadow: var(--shadow-sm); border-color: var(--border); }
+[data-style='classic'] .sidebar { box-shadow: none; }
+[data-style='classic'] .btn { border-radius: 4px; background: #fff; border: 1px solid var(--border-strong); font-weight: 500; }
+[data-style='classic'] .btn.sm { border-radius: 4px; }
+[data-style='classic'] .btn:hover { background: var(--surface-3); }
+[data-style='classic'] .btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: none;
+  font-weight: 600;
+}
+[data-style='classic'] .btn.primary:hover { background: var(--accent-strong); filter: none; }
+[data-style='classic'] .nav-item.active { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+[data-style='classic'] a { color: var(--accent); }
+[data-style='classic'] .input,
+[data-style='classic'] input[type='text'],
+[data-style='classic'] input[type='number'] { border-radius: 4px; background: #fff; border-color: var(--border-strong); }
+[data-style='classic'] .input:focus,
+[data-style='classic'] input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+[data-style='classic'] .segmented button[aria-pressed='true'] { background: var(--accent); color: #fff; }
+
+/* The balance card becomes a solid indigo block with white text. */
+[data-style='classic'] .hero {
+  --text: #ffffff;
+  --text-soft: #ebe8ff;
+  --muted: #d8d3ff;
+  --faint: #c3bcff;
+  --border: rgba(255, 255, 255, 0.28);
+  --border-strong: rgba(255, 255, 255, 0.4);
+  --accent: #ffffff;
+  --accent-strong: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.16);
+  --ok: #a7f3d0;
+  --warn: #fde68a;
+  --danger: #fecdd3;
+  background: linear-gradient(135deg, #2a16bf, #3b2be0);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+[data-style='classic'] .hero .btn { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.45); color: #fff; }
+[data-style='classic'] .hero .btn:hover { background: rgba(255, 255, 255, 0.24); }
+[data-style='classic'] .hero .btn.primary { background: #fff; border-color: #fff; color: var(--accent-strong); }
+[data-style='classic'] .hero-amount .value { color: #fff; background: none; -webkit-text-fill-color: #fff; }
+[data-style='classic'] .hero svg circle[stroke='#2dd4bf'] { stroke: #fff; }
+[data-style='classic'] .hero svg text { fill: #fff; }
+
+/* Charts follow the accent. */
+[data-style='classic'] #barAccent stop:first-child { stop-color: #5b4cf5; }
+[data-style='classic'] #barAccent stop:last-child { stop-color: #2a16bf; }
+[data-style='classic'] .chart-wrap svg path[stroke='#2dd4bf'] { stroke: var(--accent); }
+[data-style='classic'] .chart-wrap svg circle[fill='#2dd4bf'] { fill: var(--accent); }
+[data-style='classic'] #areaFill stop { stop-color: #3320d9; }
+[data-style='classic'] .hero .risk-chip,
+[data-style='classic'] .hero .badge {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+[data-style='classic'] .hero .btn.primary { color: #2813b8; }

@@ -1,5 +1,5 @@
 import { h, icon, card, openModal, closeModal, toast, download } from '../ui.js';
-import { updateSettings, clearAll, exportAll, removeMeter } from '../state.js';
+import { updateSettings, clearAll, exportAll, importAll } from '../state.js';
 import { formatMoney, formatDate } from '../format.js';
 import { languages } from '../i18n.js';
 
@@ -61,6 +61,7 @@ export function renderSettings(ctx) {
           [
             { id: 'dark', label: t('settings.dark') },
             { id: 'light', label: t('settings.light') },
+            { id: 'classic', label: t('settings.classic') },
           ],
           settings.theme,
           (id) => ctx.setTheme(id),
@@ -90,6 +91,7 @@ export function renderSettings(ctx) {
           return;
         }
         updateSettings({ notifications: true });
+        ctx.renderView(); // show the "send test" button
       } else {
         updateSettings({ notifications: false });
         toast(t('settings.notificationsOff'));
@@ -131,7 +133,18 @@ export function renderSettings(ctx) {
       settingRow({
         label: t('settings.notifications'),
         desc: t('settings.notificationsDesc'),
-        control: h('label', { class: 'switch' }, notificationsSwitch, h('span', { class: 'track' })),
+        control: h(
+          'div',
+          { class: 'row', style: { gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' } },
+          settings.notifications
+            ? h(
+                'button',
+                { class: 'btn sm', type: 'button', onclick: () => ctx.sendTestNotification() },
+                t('settings.notificationTest'),
+              )
+            : null,
+          h('label', { class: 'switch' }, notificationsSwitch, h('span', { class: 'track' })),
+        ),
       }),
     ),
     footer: h(
@@ -170,12 +183,9 @@ export function renderSettings(ctx) {
                 class: 'btn sm ghost',
                 type: 'button',
                 'aria-label': t('meters.remove'),
-                onclick: () => {
-                  removeMeter(meter.id);
-                  ctx.renderChrome();
-                  ctx.renderView();
-                  toast(t('meters.removeSuccess'));
-                },
+                // Same confirm + cleanup path as the Meters page, so the
+                // dashboard never keeps showing a meter that was removed.
+                onclick: () => ctx.confirmRemoveMeter(meter),
               },
               icon('trash', { size: 14 }),
             ),
@@ -183,6 +193,34 @@ export function renderSettings(ctx) {
         ),
       )
     : h('p', { class: 'muted small' }, t('meters.empty.body'));
+
+  const importInput = h('input', {
+    type: 'file',
+    accept: 'application/json,.json',
+    hidden: true,
+    onchange: async (event) => {
+      const file = event.target.files?.[0];
+      event.target.value = ''; // allow picking the same file again
+      if (!file) return;
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error('INVALID_BACKUP');
+        const result = importAll(await file.text());
+        const settingsNow = ctx.state.settings;
+        ctx.setTheme(settingsNow.theme);
+        ctx.setLanguage(settingsNow.lang);
+        toast(
+          t('settings.importDone'),
+          t('settings.importSummary', { added: result.added, skipped: result.skipped }),
+        );
+        // A first meter may have arrived: fetch its balance.
+        if (ctx.meter && !ctx.account) ctx.loadActive();
+        ctx.renderChrome();
+        ctx.renderView();
+      } catch {
+        toast(t('settings.importFailed'), t('settings.importFailedHelp'), { type: 'error', timeout: 7000 });
+      }
+    },
+  });
 
   const dataCard = card({
     title: t('settings.data'),
@@ -208,6 +246,13 @@ export function renderSettings(ctx) {
           },
           icon('download', { size: 16 }),
           t('settings.export'),
+        ),
+        importInput,
+        h(
+          'button',
+          { class: 'btn', type: 'button', onclick: () => importInput.click() },
+          icon('download', { size: 16, className: 'flip-v' }),
+          t('settings.import'),
         ),
         h(
           'button',
