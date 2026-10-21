@@ -167,6 +167,7 @@ export function openModal({ title, subtitle, body, footer, onClose, width }) {
   if (footNode) content.append(footNode);
   mount(root, content);
   scrim.hidden = false;
+  scrim.classList.add('blur');
   scrim.onclick = () => closeModal();
 
   const focusable = content.querySelector(
@@ -209,8 +210,10 @@ export function closeModal() {
     if (typeof activeModal.onClose === 'function') activeModal.onClose();
     activeModal = null;
   }
-  if (root) clear(root);
-  if (scrim) scrim.hidden = true;
+  if (scrim) {
+    scrim.hidden = true;
+    scrim.classList.remove('blur');
+  }
   document.body.style.overflow = '';
 }
 
