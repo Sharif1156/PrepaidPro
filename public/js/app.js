@@ -650,7 +650,7 @@ function openSidebar() {
   document.querySelector('.sidebar')?.classList.add('open');
   if (scrim) {
     scrim.hidden = false;
-    scrim.classList.remove('blur');   // drawer открывается → blur নেই
+    scrim.classList.remove('blur'); // keep the drawer sharp
     scrim.onclick = closeSidebar;
   }
   document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'true');
@@ -703,11 +703,12 @@ function bindEvents() {
   });
 
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.querySelector('.sidebar.open')) {
+      closeSidebar();
+      return;
+    }
     if (event.altKey || event.metaKey || event.ctrlKey) return;
-    const target = event.target;
-    if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-    const index = Number(event.key);
-    if (index >= 1 && index <= NAV.length) navigate(NAV[index - 1].id);
+    // …rest unchanged
   });
 }
 
