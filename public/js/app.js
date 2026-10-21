@@ -646,16 +646,23 @@ const ctx = {
 /* --------------------------------- sidebar -------------------------------- */
 
 function openSidebar() {
+  const scrim = document.getElementById('scrim');
   document.querySelector('.sidebar')?.classList.add('open');
-  document.getElementById('scrim').hidden = false;
-  document.getElementById('scrim').onclick = closeSidebar;
+  if (scrim) {
+    scrim.hidden = false;
+    scrim.classList.remove('blur');   // drawer открывается → blur নেই
+    scrim.onclick = closeSidebar;
+  }
   document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('drawer-open');
 }
 
 function closeSidebar() {
   document.querySelector('.sidebar')?.classList.remove('open');
-  document.getElementById('scrim').hidden = true;
+  const scrim = document.getElementById('scrim');
+  if (scrim) scrim.hidden = true;
   document.getElementById('menuBtn')?.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('drawer-open');
 }
 
 /* ---------------------------------- boot ---------------------------------- */
