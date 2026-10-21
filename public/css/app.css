@@ -1535,7 +1535,7 @@ svg {
   animation: fade 0.2s;
 }
 
-/* Dialogs blur the page behind them; the mobile drawer must stay sharp. */
+/* Only dialogs blur the page behind them; the mobile drawer must stay sharp. */
 .scrim.blur {
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
