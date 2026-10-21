@@ -1541,7 +1541,7 @@ svg {
   backdrop-filter: blur(4px);
 }
 
-body.drawer-open { overflow: hidden; }imation: fade 0.2s;
+body.drawer-open { overflow: hidden; }
 }
 @keyframes fade { from { opacity: 0; } }
 
@@ -1735,7 +1735,7 @@ body.drawer-open { overflow: hidden; }imation: fade 0.2s;
     transform: translateX(-102%);
     transition: transform 0.3s var(--ease);
     box-shadow: var(--shadow-lg);
-    z-index: 95;   /* ← নতুন line: scrim(90) আর tabbar(40) এর উপরে */
+    z-index: 95; /* above .scrim (90) and .tabbar (40) */
   }
   .sidebar.open { transform: none; }
   .menu-btn { display: grid; }
