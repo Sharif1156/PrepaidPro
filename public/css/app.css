@@ -1530,10 +1530,18 @@ svg {
 .scrim {
   position: fixed;
   inset: 0;
-  background: rgba(2, 7, 12, 0.68);
-  backdrop-filter: blur(4px);
+  background: rgba(2, 7, 12, 0.55);
   z-index: 90;
   animation: fade 0.2s;
+}
+
+/* Dialogs blur the page behind them; the mobile drawer must stay sharp. */
+.scrim.blur {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+body.drawer-open { overflow: hidden; }imation: fade 0.2s;
 }
 @keyframes fade { from { opacity: 0; } }
 
@@ -1727,6 +1735,7 @@ svg {
     transform: translateX(-102%);
     transition: transform 0.3s var(--ease);
     box-shadow: var(--shadow-lg);
+    z-index: 95;   /* ← নতুন line: scrim(90) আর tabbar(40) এর উপরে */
   }
   .sidebar.open { transform: none; }
   .menu-btn { display: grid; }
