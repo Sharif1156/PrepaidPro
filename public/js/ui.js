@@ -167,7 +167,7 @@ export function openModal({ title, subtitle, body, footer, onClose, width }) {
   if (footNode) content.append(footNode);
   mount(root, content);
   scrim.hidden = false;
-  scrim.classList.add('blur'); after scrim.hidden = false;
+  scrim.classList.add('blur');
   scrim.onclick = () => closeModal();
 
   const focusable = content.querySelector(
