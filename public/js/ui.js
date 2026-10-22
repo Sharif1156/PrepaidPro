@@ -206,10 +206,13 @@ export function closeModal() {
   const root = document.getElementById('modalRoot');
   const scrim = document.getElementById('scrim');
   if (activeModal) {
-    document.removeEventListener('keydown', activeModal.onKey);
-    if (typeof activeModal.onClose === 'function') activeModal.onClose();
-    activeModal = null;
+    const closing = activeModal;
+    activeModal = null; // clear first so onClose can't re-enter closeModal
+    document.removeEventListener('keydown', closing.onKey);
+    if (typeof closing.onClose === 'function') closing.onClose();
   }
+  // Actually remove the dialog from the page (it was only hiding the scrim before).
+  if (root) root.replaceChildren();
   if (scrim) {
     scrim.hidden = true;
     scrim.classList.remove('blur');
