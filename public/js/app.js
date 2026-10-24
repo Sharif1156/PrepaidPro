@@ -14,6 +14,7 @@ import { t, setLang, applyStaticTranslations } from './i18n.js';
 import { formatMoney, formatTimeAgo, formatDuration } from './format.js';
 import { icon, h, mount, toast, openModal, closeModal } from './ui.js';
 import { forecastBalance } from './lib/forecast.js';
+import { decide, playAlarm, unlockAudio } from './lib/alarm.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderMeters } from './views/meters.js';
 import { renderUsage } from './views/usage.js';
@@ -40,6 +41,8 @@ const runtime = {
   lastKey: null,
   meterSummaries: {},
   serverConfig: null,
+  prefetched: false,
+  staleRetries: 0,
 };
 
 let currentRoute = 'dashboard';
@@ -297,8 +300,21 @@ async function loadActive({ refresh = false, silent = false } = {}) {
     runtime.error = null;
     runtime.fetchedAt = null;
     runtime.fromSnapshot = false;
+    runtime.staleRetries = 0;
   }
   runtime.lastKey = key;
+
+  // Show the last saved reading straight away instead of an empty screen, then
+  // replace it as soon as the fresh one arrives. Opening the app feels instant
+  // even while the server is waking up or the utility portal is slow.
+  if (!runtime.account) {
+    const saved = getSnapshot(meter);
+    if (saved) {
+      runtime.account = saved;
+      runtime.fromSnapshot = true;
+      runtime.fetchedAt = new Date(saved.fetchedAt || Date.now());
+    }
+  }
   runtime.loading = true;
   updateStatus();
   renderMiniMeter();
@@ -314,6 +330,14 @@ async function loadActive({ refresh = false, silent = false } = {}) {
     runtime.fromSnapshot = false;
     saveSnapshot(meter, account);
     maybeNotify(meter, account);
+    prefetchOtherMeters();
+    // The server may have answered from an old copy while it refreshes: ask again shortly.
+    if (account.meta?.stale && runtime.staleRetries < 2) {
+      runtime.staleRetries += 1;
+      setTimeout(() => {
+        if (currentKey() === key) loadActive({ silent: true });
+      }, 4000);
+    }
     if (refresh) {
       toast(t('dashboard.refreshed'), `${formatMoney(account.balance, state.settings.lang)} · ${meter.provider.toUpperCase()} ${meter.accountNo}`);
     }
@@ -338,6 +362,33 @@ async function loadActive({ refresh = false, silent = false } = {}) {
   }
 }
 
+/**
+ * Warm the other saved meters in the background (two at a time, once per visit),
+ * so switching meters later is instant instead of waiting several seconds each.
+ */
+function prefetchOtherMeters() {
+  if (runtime.prefetched) return;
+  runtime.prefetched = true;
+  const queue = state.meters.filter((meter) => meter.id !== state.activeMeterId && !meter.demo);
+  const worker = async () => {
+    while (queue.length) {
+      const meter = queue.shift();
+      try {
+        const account = await fetchMeter(meter.provider, meter.accountNo, { demo: meter.demo });
+        saveSnapshot(meter, account);
+        runtime.meterSummaries[meter.id] = { account, error: null, at: Date.now() };
+        maybeNotify(meter, account);
+      } catch {
+        /* a failed warm-up is harmless; the meter loads normally when opened */
+      }
+    }
+  };
+  setTimeout(() => {
+    worker();
+    worker();
+  }, 800);
+}
+
 async function loadAllSummaries() {
   const meters = state.meters;
   await Promise.all(
@@ -346,6 +397,7 @@ async function loadAllSummaries() {
         const account = await fetchMeter(meter.provider, meter.accountNo, { demo: meter.demo });
         runtime.meterSummaries[meter.id] = { account, error: null, at: Date.now() };
         saveSnapshot(meter, account);
+        maybeNotify(meter, account);
       } catch (error) {
         runtime.meterSummaries[meter.id] = {
           account: getSnapshot(meter),
@@ -430,27 +482,114 @@ async function sendTestNotification() {
   return ok;
 }
 
-function maybeNotify(meter, account) {
-  if (!notificationSupported() || Notification.permission !== 'granted') return;
-  if (!state.settings.notifications) return;
+/**
+ * Low-balance reminders. See lib/alarm.js for the schedule (now, +5, +10, +20 min,
+ * then hourly) and the tone. Called every time a meter's balance is fetched.
+ */
+function meterName(meter) {
+  return meter.label || `${meter.provider.toUpperCase()} ${meter.accountNo}`;
+}
+
+function setAlarms(alarms) {
+  updateSettings({ alarms });
+}
+
+function fireReminder(meter, account, count) {
   const threshold = meter.threshold ?? state.settings.threshold;
-  if (typeof account.balance !== 'number' || account.balance > threshold) return;
-
-  const last = state.settings.lastNotifiedAt ? new Date(state.settings.lastNotifiedAt).getTime() : 0;
-  if (Date.now() - last < 6 * 3600_000) return;
-
   const forecast = forecastBalance(account, { threshold });
-  const name = meter.label || `${meter.provider.toUpperCase()} ${meter.accountNo}`;
   const critical = account.balance < threshold / 2;
   const title = t(critical ? 'alerts.critical.title' : 'alerts.lowBalance.title');
   const body = t(critical ? 'alerts.critical.body' : 'alerts.lowBalance.body', {
-    meter: name,
+    meter: meterName(meter),
     amount: formatMoney(account.balance, state.settings.lang),
     days: formatDuration(forecast.daysLeft, state.settings.lang),
   });
-  showNotification(title, { body, icon: '/icons/icon-192.png', tag: `prepaidpro-${meter.id}` }).then((shown) => {
-    if (shown) updateSettings({ lastNotifiedAt: new Date().toISOString() });
-  });
+  const heard = state.settings.alarmSound ? playAlarm() : false;
+  toast(title, body, { type: 'warn', timeout: 9000 });
+  if (notificationSupported() && Notification.permission === 'granted') {
+    showNotification(title, {
+      body: count > 1 ? `${body} (${t('alerts.reminderNumber', { n: count })})` : body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/favicon-32.png',
+      tag: `prepaidpro-${meter.id}`,
+      renotify: true, // sound/vibrate again even though the tag is the same
+      requireInteraction: true,
+      vibrate: [250, 120, 250, 120, 500],
+    });
+  }
+  updateSettings({ lastNotifiedAt: new Date().toISOString() });
+  return heard;
+}
+
+function maybeNotify(meter, account) {
+  if (meter.demo || !state.settings.notifications) return;
+  const alarms = { ...(state.settings.alarms || {}) };
+  const threshold = meter.threshold ?? state.settings.threshold;
+  const step = decide({ entry: alarms[meter.id], balance: account.balance, threshold });
+  if (step.action === 'none') return;
+  if (step.action === 'clear') {
+    delete alarms[meter.id];
+    setAlarms(alarms);
+    toast(t('alerts.recovered'), t('alerts.recoveredBody', { meter: meterName(meter) }));
+    return;
+  }
+  alarms[meter.id] = step.entry;
+  setAlarms(alarms);
+  fireReminder(meter, account, step.entry.count);
+}
+
+/** Every 30 s: send reminders that are due, after re-checking that the balance is still low. */
+let alarmBusy = false;
+let lastSweep = Date.now();
+async function alarmTick() {
+  if (alarmBusy || !state.settings.notifications) return;
+  alarmBusy = true;
+  try {
+    const now = Date.now();
+    const alarms = state.settings.alarms || {};
+    const due = state.meters.filter((meter) => !meter.demo && alarms[meter.id] && !alarms[meter.id].muted && now >= alarms[meter.id].nextAt);
+    // Every 10 minutes also look at every meter, to notice a balance that just got low.
+    const sweep = now - lastSweep > 10 * 60_000;
+    if (sweep) lastSweep = now;
+    const candidates = sweep ? state.meters.filter((meter) => !meter.demo) : due;
+    for (const meter of candidates) {
+      let account = null;
+      try {
+        // A due reminder must see the newest balance, otherwise a recharge is missed.
+        account = await fetchMeter(meter.provider, meter.accountNo, { refresh: due.includes(meter) });
+        saveSnapshot(meter, account);
+        runtime.meterSummaries[meter.id] = { account, error: null, at: Date.now() };
+        if (meter.id === state.activeMeterId) {
+          runtime.account = account;
+          runtime.fromSnapshot = false;
+          runtime.fetchedAt = new Date();
+          updateStatus();
+          renderMiniMeter();
+        }
+      } catch {
+        account = due.includes(meter) ? getSnapshot(meter) : null; // portal down: remind from the last known balance
+      }
+      if (account) maybeNotify(meter, account);
+    }
+    if (currentRoute === 'settings') renderView();
+  } finally {
+    alarmBusy = false;
+  }
+}
+
+function stopAlarm(meterId) {
+  const alarms = { ...(state.settings.alarms || {}) };
+  if (!alarms[meterId]) return;
+  alarms[meterId] = { ...alarms[meterId], muted: true };
+  setAlarms(alarms);
+  renderView();
+}
+
+function testAlarm() {
+  unlockAudio();
+  const heard = playAlarm();
+  if (!heard) toast(t('settings.alarmBlocked'), '', { type: 'warn' });
+  return heard;
 }
 
 /* --------------------------------- actions -------------------------------- */
@@ -522,6 +661,11 @@ function confirmRemoveMeter(meter) {
         type: 'button',
         onclick: () => {
           removeMeter(meter.id);
+          if (state.settings.alarms?.[meter.id]) {
+            const rest = { ...state.settings.alarms };
+            delete rest[meter.id];
+            setAlarms(rest);
+          }
           runtime.lastKey = null;
           runtime.account = null;
           delete runtime.meterSummaries[meter.id];
@@ -635,6 +779,8 @@ const ctx = {
   setActiveMeter,
   requestNotifications,
   sendTestNotification,
+  testAlarm,
+  stopAlarm,
   setTheme,
   setLanguage,
   renderChrome,
@@ -708,7 +854,10 @@ function bindEvents() {
       return;
     }
     if (event.altKey || event.metaKey || event.ctrlKey) return;
-    // …rest unchanged
+    const target = event.target;
+    if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+    const index = Number(event.key);
+    if (index >= 1 && index <= NAV.length) navigate(NAV[index - 1].id);
   });
 }
 
@@ -722,6 +871,17 @@ async function registerServiceWorker() {
 }
 
 async function boot() {
+  // Browsers only let a page make sound after the person has touched it once.
+  const unlock = () => {
+    unlockAudio();
+    for (const type of ['pointerdown', 'keydown']) window.removeEventListener(type, unlock, true);
+  };
+  for (const type of ['pointerdown', 'keydown']) window.addEventListener(type, unlock, true);
+  setInterval(alarmTick, 30_000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) alarmTick();
+  });
+
   currentRoute = parseRoute();
   setLang(state.settings.lang);
   setTheme(state.settings.theme);
@@ -730,10 +890,11 @@ async function boot() {
   renderChrome();
   renderView();
 
-  runtime.serverConfig = await fetchServerConfig();
-  if (runtime.serverConfig?.demoMode) {
-    console.info('PrepaidPro is running in demo mode.');
-  }
+  // Do not make the balance wait for the config call: they run side by side.
+  fetchServerConfig().then((config) => {
+    runtime.serverConfig = config;
+    if (config?.demoMode) console.info('PrepaidPro is running in demo mode.');
+  });
 
   if (state.meters.length) {
     await loadActive();

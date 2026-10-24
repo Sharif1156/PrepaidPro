@@ -56,10 +56,19 @@ async function requestJson(url, { timeoutMs = 45_000 } = {}) {
 export async function fetchMeter(provider, accountNo, { refresh = false, demo = false } = {}) {
   const query = refresh ? '?refresh=1' : '';
   const base = demo ? '/api/demo' : '/api/meter';
-  const payload = await requestJson(
-    `${base}/${encodeURIComponent(provider)}/${encodeURIComponent(accountNo)}${query}`,
-  );
-  return payload.account;
+  const url = `${base}/${encodeURIComponent(provider)}/${encodeURIComponent(accountNo)}${query}`;
+  // A free server that was asleep needs up to ~50s to wake: wait for it, and if
+  // the connection still drops once while waking, try one more time.
+  const options = { timeoutMs: 75_000 };
+  try {
+    return (await requestJson(url, options)).account;
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'NETWORK') {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      return (await requestJson(url, options)).account;
+    }
+    throw error;
+  }
 }
 
 export async function fetchServerConfig() {

@@ -1,5 +1,5 @@
 /* PrepaidPro service worker: offline app shell + last-known balance. */
-const VERSION = 'prepaidpro-v1.0.2';
+const VERSION = 'prepaidpro-v1.0.5';
 const SHELL = [
   '/',
   '/index.html',
@@ -18,6 +18,7 @@ const SHELL = [
   '/js/views/settings.js',
   '/js/views/onboarding.js',
   '/js/lib/forecast.js',
+  '/js/lib/alarm.js',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -69,20 +70,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // App shell: cache first, refresh in the background.
+  // App shell: network first, so a new deploy shows up on the very next open
+  // instead of one visit later. If the network is slow (a sleeping free server)
+  // or offline, fall back to the cached copy after 3 seconds.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok && response.type === 'basic') {
-            const copy = response.clone();
-            caches.open(VERSION).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    }),
+    (async () => {
+      const cache = await caches.open(VERSION);
+      const network = fetch(request).then((response) => {
+        if (response.ok && response.type === 'basic') cache.put(request, response.clone());
+        return response;
+      });
+      const cached = await cache.match(request);
+      if (!cached) return network;
+      const timeout = new Promise((resolve) => setTimeout(() => resolve(cached), 3000));
+      return Promise.race([network.catch(() => cached), timeout]);
+    })(),
   );
 });
 

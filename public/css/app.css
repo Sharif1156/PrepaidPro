@@ -1533,8 +1533,6 @@ svg {
   background: rgba(2, 7, 12, 0.55);
   z-index: 90;
   animation: fade 0.2s;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 /* Dialogs blur the page behind them; the mobile drawer must stay sharp. */
@@ -1544,7 +1542,6 @@ svg {
 }
 
 body.drawer-open { overflow: hidden; }
-}
 @keyframes fade { from { opacity: 0; } }
 
 /* --------------------------------- toasts -------------------------------- */
@@ -1737,20 +1734,15 @@ body.drawer-open { overflow: hidden; }
     transform: translateX(-102%);
     transition: transform 0.3s var(--ease);
     box-shadow: var(--shadow-lg);
-    z-index: 95; /* above .scrim (90) and .tabbar (40) */
+    /* Above .scrim (90) and .tabbar (40): the open menu must be sharp and tappable. */
+    z-index: 95;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--surface);
   }
   .sidebar.open { transform: none; }
-  /* The drawer must stay crisp: solid background, no backdrop blur. */
-  .sidebar {
-    background: var(--bg);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-  body.drawer-open .topbar,
-  body.drawer-open .tabbar {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
   .menu-btn { display: grid; }
   .topbar { padding: 0 18px; }
   #view { padding: 20px 18px 96px; }

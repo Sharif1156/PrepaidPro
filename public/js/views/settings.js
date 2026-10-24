@@ -99,6 +99,49 @@ export function renderSettings(ctx) {
     },
   });
 
+  const soundSwitch = h('input', {
+    type: 'checkbox',
+    checked: settings.alarmSound !== false,
+    onchange: (event) => {
+      updateSettings({ alarmSound: event.target.checked });
+      if (event.target.checked) ctx.testAlarm();
+    },
+  });
+
+  const alarmEntries = state.meters
+    .filter((meter) => !meter.demo && settings.alarms?.[meter.id])
+    .map((meter) => ({ meter, entry: settings.alarms[meter.id] }));
+
+  const activeAlarms = alarmEntries.length
+    ? h(
+        'div',
+        { class: 'stack', style: { gap: '8px', padding: '12px 0 2px' } },
+        h('p', { class: 'label' }, t('settings.alarmActive')),
+        ...alarmEntries.map(({ meter, entry }) => {
+          const minutes = Math.max(0, Math.ceil((entry.nextAt - Date.now()) / 60000));
+          return h(
+            'div',
+            { class: 'row', style: { justifyContent: 'space-between', gap: '12px' } },
+            h(
+              'div',
+              {},
+              h('p', { class: 'list-title' }, meter.label || `${meter.provider.toUpperCase()} ${meter.accountNo}`),
+              h(
+                'p',
+                { class: 'list-sub' },
+                entry.muted
+                  ? t('settings.alarmMuted')
+                  : t('settings.alarmNext', { min: minutes, count: entry.count }),
+              ),
+            ),
+            entry.muted
+              ? null
+              : h('button', { class: 'btn sm', type: 'button', onclick: () => ctx.stopAlarm(meter.id) }, t('settings.alarmStop')),
+          );
+        }),
+      )
+    : null;
+
   const alertsCard = card({
     title: t('settings.alerts'),
     subtitle: t('settings.savePrefs'),
@@ -146,6 +189,17 @@ export function renderSettings(ctx) {
           h('label', { class: 'switch' }, notificationsSwitch, h('span', { class: 'track' })),
         ),
       }),
+      settingRow({
+        label: t('settings.alarmSound'),
+        desc: t('settings.alarmSoundDesc'),
+        control: h(
+          'div',
+          { class: 'row', style: { gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' } },
+          h('button', { class: 'btn sm', type: 'button', onclick: () => ctx.testAlarm() }, t('settings.alarmTest')),
+          h('label', { class: 'switch' }, soundSwitch, h('span', { class: 'track' })),
+        ),
+      }),
+      activeAlarms,
     ),
     footer: h(
       'div',

@@ -167,7 +167,7 @@ export function openModal({ title, subtitle, body, footer, onClose, width }) {
   if (footNode) content.append(footNode);
   mount(root, content);
   scrim.hidden = false;
-  scrim.classList.add('blur');
+  scrim.classList.add('blur'); // dialogs blur the page behind them
   scrim.onclick = () => closeModal();
 
   const focusable = content.querySelector(
@@ -206,13 +206,10 @@ export function closeModal() {
   const root = document.getElementById('modalRoot');
   const scrim = document.getElementById('scrim');
   if (activeModal) {
-    const closing = activeModal;
-    activeModal = null; // clear first so onClose can't re-enter closeModal
-    document.removeEventListener('keydown', closing.onKey);
-    if (typeof closing.onClose === 'function') closing.onClose();
+    document.removeEventListener('keydown', activeModal.onKey);
+    if (typeof activeModal.onClose === 'function') activeModal.onClose();
+    activeModal = null;
   }
-  // Actually remove the dialog from the page (it was only hiding the scrim before).
-  if (root) root.replaceChildren();
   if (scrim) {
     scrim.hidden = true;
     scrim.classList.remove('blur');

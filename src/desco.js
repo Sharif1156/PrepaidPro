@@ -233,8 +233,39 @@ export async function fetchDesco(accountNo, { historyDays = config.historyDays, 
   let source = null;
   let lastError = null;
 
+  // The three "details" calls (info, monthly, recharges) do not depend on the
+  // balance value, only on which API generation answers. Start them for the
+  // first source at the same time as its balance call instead of afterwards:
+  // one round trip of waiting instead of two.
+  const extrasBySource = new Map();
+  const extrasFor = (candidate) => {
+    if (!extrasBySource.has(candidate.id)) {
+      const base = candidate.base;
+      extrasBySource.set(
+        candidate.id,
+        Promise.all([
+          tryJson(`${base}/getCustomerInfo?${query}`),
+          tryJson(
+            `${base}/getCustomerMonthlyConsumption?${query}&monthFrom=${monthRange(11).monthFrom}&monthTo=${
+              monthRange(0).monthTo
+            }`,
+          ),
+          tryJson(
+            `${base}/getRechargeHistory?${query}&dateFrom=${dateRange(historyDays).dateFrom}&dateTo=${
+              dateRange(0).dateTo
+            }`,
+          ),
+        ]),
+      );
+    }
+    return extrasBySource.get(candidate.id);
+  };
+
+  const firstBalance = tryJson(`${SOURCES[0].base}/getBalance?${query}`);
+  extrasFor(SOURCES[0]);
+
   for (const candidate of SOURCES) {
-    const payload = await tryJson(`${candidate.base}/getBalance?${query}`);
+    const payload = candidate === SOURCES[0] ? await firstBalance : await tryJson(`${candidate.base}/getBalance?${query}`);
     if (payload.__error) {
       lastError = payload.__error;
       continue;
@@ -260,21 +291,7 @@ export async function fetchDesco(accountNo, { historyDays = config.historyDays, 
   }
 
   const balanceIndex = indexKeys(balancePayload);
-  const base = source.base;
-
-  const [infoPayload, monthlyPayload, rechargePayload] = await Promise.all([
-    tryJson(`${base}/getCustomerInfo?${query}`),
-    tryJson(
-      `${base}/getCustomerMonthlyConsumption?${query}&monthFrom=${monthRange(11).monthFrom}&monthTo=${
-        monthRange(0).monthTo
-      }`,
-    ),
-    tryJson(
-      `${base}/getRechargeHistory?${query}&dateFrom=${dateRange(historyDays).dateFrom}&dateTo=${
-        dateRange(0).dateTo
-      }`,
-    ),
-  ]);
+  const [infoPayload, monthlyPayload, rechargePayload] = await extrasFor(source);
 
   const infoIndex = infoPayload.__error ? new Map() : indexKeys(toObject(infoPayload?.data ?? infoPayload));
   const customer = normalizeCustomer(infoIndex);

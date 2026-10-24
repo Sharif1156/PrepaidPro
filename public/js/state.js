@@ -14,6 +14,9 @@ const defaultSettings = {
   threshold: 200,
   notifications: false,
   lastNotifiedAt: null,
+  alarmSound: true,
+  // Active low-balance reminders, per meter id: { count, nextAt, muted }.
+  alarms: {},
 };
 
 const listeners = new Set();
@@ -48,6 +51,7 @@ function load() {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     const meters = Array.isArray(raw?.meters) ? raw.meters.map(sanitizeMeter).filter(Boolean) : [];
     const settings = { ...defaultSettings, ...(raw?.settings || {}) };
+    if (!settings.alarms || typeof settings.alarms !== 'object' || Array.isArray(settings.alarms)) settings.alarms = {};
     if (!['en', 'bn'].includes(settings.lang)) settings.lang = 'en';
     if (!['dark', 'light', 'classic'].includes(settings.theme)) settings.theme = 'dark';
     return {

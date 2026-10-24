@@ -12,6 +12,9 @@ import { fetchDemo } from './src/demo.js';
 
 const PUBLIC_DIR = resolve(process.cwd(), 'public');
 const cache = createCache({ ttlMs: config.cacheTtlMs });
+// After the normal TTL a balance is still served instantly for this long while
+// a fresh copy loads in the background; the app then refreshes by itself.
+const STALE_WINDOW_MS = 60 * 60 * 1000;
 const startedAt = Date.now();
 
 const MIME = {
@@ -88,13 +91,14 @@ async function loadCachedMeter(provider, accountNo, refresh) {
   const result = await cache.wrap(key, async () => {
     if (config.demoMode) return fetchDemo(provider, accountNo);
     return provider === 'desco' ? fetchDesco(accountNo) : fetchNesco(accountNo);
-  });
+  }, config.cacheTtlMs, { staleMs: config.demoMode ? 0 : STALE_WINDOW_MS });
 
   return {
     ...result.value,
     meta: {
       ...(result.value.meta || {}),
       cached: result.cached,
+      stale: Boolean(result.stale),
       cacheTtlSeconds: Math.round(config.cacheTtlMs / 1000),
     },
   };
