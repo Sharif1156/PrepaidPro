@@ -71,6 +71,7 @@ export function unlockAudio() {
  * Returns true when the browser let it play.
  */
 export function playAlarm({ volume = 0.35 } = {}) {
+  if (playCustom()) return true;
   const ctx = context();
   if (!ctx) return false;
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -99,4 +100,80 @@ export function playAlarm({ volume = 0.35 } = {}) {
     /* not supported */
   }
   return true;
+}
+
+/* ---------------------------- the person's own tone ---------------------------- */
+
+const TONE_KEY = 'prepaidpro:tone';
+export const MAX_TONE_BYTES = 1024 * 1024; // 1 MB keeps localStorage healthy
+const MAX_TONE_SECONDS = 15;
+
+export function customToneName() {
+  try {
+    return JSON.parse(localStorage.getItem(TONE_KEY) || 'null')?.name || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Save an audio file as the warning tone. Rejects when it is too big or not audio. */
+export function saveCustomTone(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !String(file.type).startsWith('audio/') || file.size > MAX_TONE_BYTES) {
+      reject(new Error('INVALID_TONE'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('INVALID_TONE'));
+    reader.onload = () => {
+      try {
+        localStorage.setItem(TONE_KEY, JSON.stringify({ name: file.name.slice(0, 60), data: reader.result }));
+        resolve(file.name);
+      } catch {
+        reject(new Error('INVALID_TONE'));
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+export function clearCustomTone() {
+  try {
+    localStorage.removeItem(TONE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+let customAudio = null;
+
+/** Plays the saved tone (up to 15 s). Returns false when none is saved. */
+function playCustom() {
+  let data = null;
+  try {
+    data = JSON.parse(localStorage.getItem(TONE_KEY) || 'null')?.data;
+  } catch {
+    /* ignore */
+  }
+  if (!data) return false;
+  try {
+    if (customAudio) customAudio.pause();
+    customAudio = new Audio(data);
+    customAudio.volume = 1;
+    customAudio.play().catch(() => {
+      // blocked or undecodable: fall back to the built-in siren
+      clearTimeout(customAudio?._t);
+      customAudio = null;
+      const saved = localStorage.getItem(TONE_KEY);
+      localStorage.removeItem(TONE_KEY);
+      playAlarm();
+      if (saved) localStorage.setItem(TONE_KEY, saved);
+    });
+    const a = customAudio;
+    a._t = setTimeout(() => a.pause(), MAX_TONE_SECONDS * 1000);
+    navigator.vibrate?.([250, 120, 250, 120, 500]);
+    return true;
+  } catch {
+    return false;
+  }
 }

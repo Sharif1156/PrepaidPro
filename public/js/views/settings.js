@@ -1,3 +1,4 @@
+import { customToneName, saveCustomTone, clearCustomTone } from '../lib/alarm.js';
 import { h, icon, card, openModal, closeModal, toast, download } from '../ui.js';
 import { updateSettings, clearAll, exportAll, importAll } from '../state.js';
 import { formatMoney, formatDate } from '../format.js';
@@ -108,6 +109,26 @@ export function renderSettings(ctx) {
     },
   });
 
+  const toneInput = h('input', {
+    type: 'file',
+    accept: 'audio/*',
+    hidden: true,
+    onchange: async (event) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      try {
+        await saveCustomTone(file);
+        toast(t('settings.toneSaved'), file.name);
+        ctx.testAlarm();
+        ctx.renderView();
+      } catch {
+        toast(t('settings.toneFailed'), t('settings.toneFailedHelp'), { type: 'error', timeout: 7000 });
+      }
+    },
+  });
+  const toneName = customToneName();
+
   const alarmEntries = state.meters
     .filter((meter) => !meter.demo && settings.alarms?.[meter.id])
     .map((meter) => ({ meter, entry: settings.alarms[meter.id] }));
@@ -197,6 +218,19 @@ export function renderSettings(ctx) {
           { class: 'row', style: { gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' } },
           h('button', { class: 'btn sm', type: 'button', onclick: () => ctx.testAlarm() }, t('settings.alarmTest')),
           h('label', { class: 'switch' }, soundSwitch, h('span', { class: 'track' })),
+        ),
+      }),
+      settingRow({
+        label: t('settings.toneCustom'),
+        desc: toneName ? t('settings.toneCurrent', { name: toneName }) : t('settings.toneCustomDesc'),
+        control: h(
+          'div',
+          { class: 'row', style: { gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' } },
+          toneInput,
+          h('button', { class: 'btn sm', type: 'button', onclick: () => toneInput.click() }, t('settings.toneChoose')),
+          toneName
+            ? h('button', { class: 'btn sm', type: 'button', onclick: () => { clearCustomTone(); toast(t('settings.toneRemoved')); ctx.renderView(); } }, t('settings.toneRemove'))
+            : null,
         ),
       }),
       activeAlarms,
