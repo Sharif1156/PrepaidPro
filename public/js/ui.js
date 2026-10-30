@@ -210,6 +210,7 @@ export function closeModal() {
     if (typeof activeModal.onClose === 'function') activeModal.onClose();
     activeModal = null;
   }
+  if (root) clear(root);
   if (scrim) {
     scrim.hidden = true;
     scrim.classList.remove('blur');
