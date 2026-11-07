@@ -1,6 +1,7 @@
 import { requestJson } from './http.js';
 import { accountNotFound, badRequest, upstreamError } from './errors.js';
 import { config } from './config.js';
+import { api, accountIdFor, credentials } from './desco-session.js';
 
 /**
  * DESCO exposes two generations of the same public API:
@@ -21,7 +22,7 @@ const SOURCES = [
 const BALANCE_KEYS = ['balance', 'remainingbalance', 'balanceamount', 'remainingbalanceamount'];
 const METER_KEYS = ['meterno', 'meternumber', 'meterid'];
 const READING_KEYS = ['readingtime', 'lastreadingtime', 'readingdate', 'lastreadingdate', 'updatedtime'];
-const MONTH_COST_KEYS = ['currentmonthconsumption', 'currentmonthbill', 'monthlyconsumption', 'currentmonthcost'];
+const MONTH_COST_KEYS = ['currentmonthconsumedtaka', 'currentmonthconsumption', 'currentmonthbill', 'monthlyconsumption', 'currentmonthcost'];
 const MONTH_UNIT_KEYS = ['currentmonthunit', 'currentmonthconsumptionunit', 'monthlyunit'];
 
 export function normalizeAccountNo(value) {
@@ -163,13 +164,13 @@ function normalizeMonthly(rows) {
     .map((row) => {
       const index = indexKeys(toObject(row));
       const month =
-        pickString(index, ['month', 'monthname', 'consumptionmonth', 'billyearmonth']) ||
+        pickString(index, ['month', 'monthname', 'consumptionmonth', 'billyearmonth', 'monthyear', 'billingmonth', 'periodmonth']) ||
         pickString(index, ['yearmonth']);
       const normalisedMonth = parseMonth(month);
       if (!normalisedMonth) return null;
       return {
         month: normalisedMonth,
-        unit: pickNumber(index, ['consumedunit', 'consumptionunit', 'unit', 'totalunit', 'consumedkwh']),
+        unit: pickNumber(index, ['consumedunit', 'consumptionunit', 'unit', 'totalunit', 'consumedkwh', 'kwh', 'energykwh', 'consumedenergy']),
         taka: pickNumber(index, ['consumedtaka', 'consumptiontaka', 'taka', 'amount', 'bill', 'totalamount']),
         demand: pickNumber(index, ['maximumdemand', 'maxdemand', 'demand']),
       };
@@ -183,9 +184,9 @@ function normalizeRecharges(rows) {
     .map((row) => {
       const index = indexKeys(toObject(row));
       const date = parseBdDate(
-        pickString(index, ['rechargedate', 'rechargedtime', 'purchasedate', 'date', 'transactiondate']),
+        pickString(index, ['rechargedate', 'rechargedtime', 'purchasedate', 'date', 'transactiondate', 'transactiontime', 'paidat', 'createdat', 'timestamp']),
       );
-      const amount = pickNumber(index, ['totalamount', 'rechargeamount', 'amount', 'paidamount']);
+      const amount = pickNumber(index, ['totalamount', 'rechargeamount', 'amount', 'paidamount', 'grossamount', 'netamount']);
       return {
         date,
         amount,
@@ -225,7 +226,7 @@ async function tryJson(url) {
  * Fetch and normalise a DESCO prepaid account.
  * Throws AppError with a machine-readable code on failure.
  */
-export async function fetchDesco(accountNo, { historyDays = config.historyDays, refresh = false } = {}) {
+async function fetchDescoPublic(accountNo, { historyDays = config.historyDays, refresh = false } = {}) {
   const account = validateAccountNo(accountNo);
   const query = `accountNo=${encodeURIComponent(account)}`;
 
@@ -330,4 +331,83 @@ export async function fetchDesco(accountNo, { historyDays = config.historyDays, 
     fetchedAt: new Date().toISOString(),
     meta: { historyDays, refresh },
   };
+}
+
+/** First array found in a payload, whatever the portal calls it. */
+export function rowsOf(payload, depth = 0) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object' || depth > 2) return [];
+  for (const value of Object.values(payload)) if (Array.isArray(value)) return value;
+  for (const value of Object.values(payload)) {
+    const rows = rowsOf(value, depth + 1);
+    if (rows.length) return rows;
+  }
+  return [];
+}
+
+async function trySession(path, query) {
+  try {
+    return await api(path, { query });
+  } catch (error) {
+    return { __error: error };
+  }
+}
+
+/** New portal: signed-in session, meter linked to the server's DESCO login. */
+async function fetchDescoSession(accountNo, { historyDays = config.historyDays, refresh = false } = {}) {
+  const account = validateAccountNo(accountNo);
+  const id = await accountIdFor(account);
+  const base = `/api/accounts/${encodeURIComponent(id)}`;
+
+  const [balancePayload, summaryPayload, monthlyPayload, transactionPayload] = await Promise.all([
+    api(`${base}/balance`),
+    trySession(`${base}/summary`),
+    trySession(`${base}/usage/monthly`, monthRange(11)),
+    trySession(`${base}/transactions`, dateRange(historyDays)),
+  ]);
+
+  const balanceIndex = indexKeys(toObject(balancePayload?.data ?? balancePayload));
+  const infoIndex = summaryPayload.__error
+    ? new Map()
+    : indexKeys(toObject(summaryPayload?.data ?? summaryPayload));
+  const customer = normalizeCustomer(infoIndex);
+  const monthly = monthlyPayload.__error ? [] : normalizeMonthly(rowsOf(monthlyPayload));
+  const recharges = transactionPayload.__error ? [] : normalizeRecharges(rowsOf(transactionPayload));
+
+  const balance = pickNumber(balanceIndex, BALANCE_KEYS);
+  if (balance === null) throw accountNotFound('DESCO');
+  const meterNo = pickString(balanceIndex, METER_KEYS) || pickString(infoIndex, METER_KEYS);
+  const readingTime = parseBdDate(pickString(balanceIndex, READING_KEYS));
+  const currentMonth =
+    monthly.find((row) => row.month === yearMonth(new Date())) || monthly[monthly.length - 1] || null;
+
+  return {
+    provider: 'desco',
+    accountNo: account,
+    source: 'portal',
+    demo: false,
+    balance,
+    meterNo: meterNo || null,
+    readingTime: readingTime || null,
+    customer,
+    currentMonth: currentMonth
+      ? { month: currentMonth.month, taka: currentMonth.taka, unit: currentMonth.unit }
+      : {
+          month: yearMonth(new Date()),
+          taka: pickNumber(balanceIndex, MONTH_COST_KEYS),
+          unit: pickNumber(balanceIndex, MONTH_UNIT_KEYS),
+        },
+    monthly,
+    recharges,
+    fetchedAt: new Date().toISOString(),
+    meta: { historyDays, refresh },
+  };
+}
+
+/**
+ * With DESCO_USERNAME / DESCO_PASSWORD set, use the new signed-in portal.
+ * Without them, fall back to the old public endpoints.
+ */
+export function fetchDesco(accountNo, options) {
+  return credentials() ? fetchDescoSession(accountNo, options) : fetchDescoPublic(accountNo, options);
 }
