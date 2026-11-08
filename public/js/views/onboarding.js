@@ -53,17 +53,19 @@ export function renderOnboarding(ctx) {
     h(
       'div',
       { class: 'onboard-actions' },
-      h(
-        'button',
-        { class: 'btn primary', type: 'button', onclick: () => ctx.openAddMeter() },
-        icon('plus', { size: 17 }),
-        t('onboarding.add'),
-      ),
+      ctx.serverConfig?.demoMode
+        ? h(
+            'button',
+            { class: 'btn primary', type: 'button', onclick: () => ctx.openAddMeter() },
+            icon('plus', { size: 17 }),
+            t('onboarding.add'),
+          )
+        : null,
       ctx.serverConfig?.demoMode
         ? null
         : h(
             'button',
-            { class: 'btn', type: 'button', onclick: () => ctx.navigate('desco-login') },
+            { class: 'btn primary', type: 'button', onclick: () => ctx.navigate('desco-login') },
             icon('shield', { size: 17 }),
             t('dlogin.signIn'),
           ),

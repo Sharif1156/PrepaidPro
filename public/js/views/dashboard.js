@@ -130,12 +130,14 @@ function fullErrorCard(ctx) {
                 icon('refresh', { size: 16 }),
                 t('errors.retry'),
               ),
-          h(
-            'button',
-            { class: 'btn ghost', type: 'button', onclick: () => ctx.openAddMeter() },
-            icon('plus', { size: 16 }),
-            t('meters.add'),
-          ),
+          key === 'login'
+            ? null
+            : h(
+                'button',
+                { class: 'btn ghost', type: 'button', onclick: () => ctx.openAddMeter() },
+                icon('plus', { size: 16 }),
+                t('meters.add'),
+              ),
         ),
         error?.message
           ? h(
