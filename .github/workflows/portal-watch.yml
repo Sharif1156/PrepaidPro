@@ -1,0 +1,60 @@
+name: DESCO portal watch
+
+# Every day, sign in to the DESCO prepaid portal and check that everything
+# PrepaidPro reads still works. If something changed, open (or update) an issue
+# so you get an email. The report contains field NAMES only, never your data.
+#
+# One-time setup: repo Settings > Secrets and variables > Actions > New secret
+#   DESCO_USERNAME  (your DESCO login)
+#   DESCO_PASSWORD
+
+on:
+  schedule:
+    - cron: '30 2 * * *' # 08:30 Bangladesh time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the portal
+        id: check
+        continue-on-error: true
+        env:
+          DESCO_USERNAME: ${{ secrets.DESCO_USERNAME }}
+          DESCO_PASSWORD: ${{ secrets.DESCO_PASSWORD }}
+          # DESCO serves an incomplete certificate chain (same reason as on Render).
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: node scripts/portal-check.mjs
+
+      - name: Open or update an issue when something is wrong
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="DESCO portal changed: PrepaidPro needs an update"
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file portal-report.md
+          else
+            gh issue create --title "$title" --body-file portal-report.md
+          fi
+
+      - name: Close the issue when it is fixed
+        if: steps.check.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --search "DESCO portal changed in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "The portal check passes again."
+          fi

@@ -144,13 +144,13 @@ function ymd(date) {
   return date.toISOString().slice(0, 10);
 }
 
-function monthRange(monthsBack) {
+export function monthRange(monthsBack) {
   const now = new Date();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsBack, 1));
   return { monthFrom: from.toISOString().slice(0, 7), monthTo: now.toISOString().slice(0, 7) };
 }
 
-function dateRange(daysBack) {
+export function dateRange(daysBack) {
   const now = new Date();
   const from = new Date(now.getTime() - daysBack * 86_400_000);
   return { dateFrom: ymd(from), dateTo: ymd(now) };
@@ -160,7 +160,7 @@ function yearMonth(date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-function normalizeMonthly(rows) {
+export function normalizeMonthly(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const index = indexKeys(toObject(row));
@@ -180,7 +180,7 @@ function normalizeMonthly(rows) {
     .sort((a, b) => a.month.localeCompare(b.month));
 }
 
-function normalizeRecharges(rows) {
+export function normalizeRecharges(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const index = indexKeys(toObject(row));
@@ -422,7 +422,7 @@ export function fetchDesco(accountNo, options) {
 
 /* ------------------------- daily usage and token lists ------------------------ */
 
-function normalizeDaily(rows) {
+export function normalizeDaily(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const index = indexKeys(toObject(row));
@@ -439,7 +439,7 @@ function normalizeDaily(rows) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function normalizeTokens(rows) {
+export function normalizeTokens(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const index = indexKeys(toObject(row));

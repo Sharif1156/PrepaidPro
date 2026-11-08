@@ -294,3 +294,11 @@ endorsed by, or operated by DESCO, NESCO or the Government of Bangladesh.
 
 MIT. Fonts are SIL Open Font Licensed and ship with their licence files in
 `public/fonts/`.
+
+## Portal watch
+
+`.github/workflows/portal-watch.yml` signs in to the DESCO portal every morning and checks that everything
+PrepaidPro reads still works. When DESCO changes something it opens a GitHub issue (you get an email) with a
+report of field names and types, never personal data. Add the repository secrets `DESCO_USERNAME` and
+`DESCO_PASSWORD` once. Run it by hand from the Actions tab with "Run workflow", or locally with
+`DESCO_USERNAME=... DESCO_PASSWORD=... node scripts/portal-check.mjs`.
