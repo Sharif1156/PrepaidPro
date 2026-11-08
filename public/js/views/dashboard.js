@@ -95,6 +95,7 @@ function errorCodeKey(error) {
   if (error.code === 'OFFLINE' || error.code === 'NETWORK') return 'network';
   if (error.code === 'ACCOUNT_NOT_FOUND') return 'notfound';
   if (error.code === 'RATE_LIMITED') return 'rate';
+  if (['DESCO_LOGIN_REQUIRED', 'DESCO_AUTH_INVALID', 'DESCO_AUTH_EXPIRED'].includes(error.code)) return 'login';
   return 'network';
 }
 
@@ -116,12 +117,19 @@ function fullErrorCard(ctx) {
         h(
           'div',
           { class: 'row', style: { justifyContent: 'center', marginTop: '6px' } },
-          h(
-            'button',
-            { class: 'btn primary', type: 'button', onclick: () => ctx.refresh(true) },
-            icon('refresh', { size: 16 }),
-            t('errors.retry'),
-          ),
+          key === 'login'
+            ? h(
+                'button',
+                { class: 'btn primary', type: 'button', onclick: () => ctx.navigate('desco-login') },
+                icon('shield', { size: 16 }),
+                t('dlogin.signIn'),
+              )
+            : h(
+                'button',
+                { class: 'btn primary', type: 'button', onclick: () => ctx.refresh(true) },
+                icon('refresh', { size: 16 }),
+                t('errors.retry'),
+              ),
           h(
             'button',
             { class: 'btn ghost', type: 'button', onclick: () => ctx.openAddMeter() },

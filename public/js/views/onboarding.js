@@ -59,6 +59,14 @@ export function renderOnboarding(ctx) {
         icon('plus', { size: 17 }),
         t('onboarding.add'),
       ),
+      ctx.serverConfig?.demoMode
+        ? null
+        : h(
+            'button',
+            { class: 'btn', type: 'button', onclick: () => ctx.navigate('desco-login') },
+            icon('shield', { size: 17 }),
+            t('dlogin.signIn'),
+          ),
       h(
         'button',
         { class: 'btn ghost', type: 'button', onclick: () => ctx.startDemo() },

@@ -20,9 +20,10 @@ import { renderMeters } from './views/meters.js';
 import { renderUsage } from './views/usage.js';
 import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
+import { renderDescoLogin } from './views/descologin.js';
 import { renderOnboarding } from './views/onboarding.js';
 
-const ROUTES = ['dashboard', 'meters', 'usage', 'insights', 'settings'];
+const ROUTES = ['dashboard', 'meters', 'usage', 'insights', 'settings', 'desco-login'];
 
 const NAV = [
   { id: 'dashboard', label: 'nav.dashboard', icon: 'grid' },
@@ -60,7 +61,7 @@ function parseRoute() {
 
 function routeMeta(route) {
   return {
-    title: t(`nav.${route}`),
+    title: route === 'desco-login' ? t('dlogin.heading') : t(`nav.${route}`),
     subtitle: {
       dashboard: t('dashboard.subtitle'),
       meters: t('meters.subtitle'),
@@ -762,6 +763,7 @@ const VIEWS = {
   usage: renderUsage,
   insights: renderInsights,
   settings: renderSettings,
+  'desco-login': renderDescoLogin,
 };
 
 function renderView() {
@@ -771,7 +773,7 @@ function renderView() {
   const meter = activeMeter();
 
   let node;
-  if (!meter && currentRoute !== 'settings') {
+  if (!meter && currentRoute !== 'settings' && currentRoute !== 'desco-login') {
     node = renderOnboarding(ctx);
   } else {
     const render = VIEWS[currentRoute] || renderDashboard;

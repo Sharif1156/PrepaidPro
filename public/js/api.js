@@ -11,13 +11,43 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(url, { timeoutMs = 45_000, method = 'GET', headers = {} } = {}) {
+const AUTH_KEY = 'prepaidpro:desco-auth';
+
+/** The sealed DESCO sign-in token lives apart from app state, so it is never exported. */
+export function getDescoAuth() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+export function setDescoAuth(value) {
+  try {
+    if (value) localStorage.setItem(AUTH_KEY, JSON.stringify(value));
+    else localStorage.removeItem(AUTH_KEY);
+  } catch {
+    /* storage blocked: sign-in lasts until reload only */
+  }
+  authListeners.forEach((fn) => fn());
+}
+
+const authListeners = new Set();
+export function onDescoAuthChange(fn) {
+  authListeners.add(fn);
+}
+
+async function requestJson(url, { timeoutMs = 45_000, method = 'GET', headers = {}, body } = {}) {
+  const auth = getDescoAuth();
+  if (auth?.token && String(url).startsWith('/api/')) headers = { ...headers, 'X-Desco-Auth': auth.token };
+  if (body !== undefined) headers = { ...headers, 'Content-Type': 'application/json', 'X-Requested-With': 'PrepaidPro' };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
     response = await fetch(url, {
       method,
+      body: body === undefined ? undefined : JSON.stringify(body),
       headers: { Accept: 'application/json', ...headers },
       signal: controller.signal,
       credentials: 'same-origin',
@@ -45,6 +75,7 @@ async function requestJson(url, { timeoutMs = 45_000, method = 'GET', headers = 
 
   if (!response.ok || payload?.ok === false) {
     const error = payload?.error || {};
+    if (['DESCO_AUTH_INVALID', 'DESCO_AUTH_EXPIRED'].includes(error.code)) setDescoAuth(null);
     throw new ApiError(error.code || 'HTTP_ERROR', error.message, {
       status: response.status,
       retryable: error.retryable !== false,
@@ -99,4 +130,23 @@ export async function fetchNotices() {
 export async function requestRealtime(provider, accountNo) {
   const url = `/api/meter/${encodeURIComponent(provider)}/${encodeURIComponent(accountNo)}/realtime`;
   return (await requestJson(url, { method: 'POST', headers: { 'X-Requested-With': 'PrepaidPro' }, timeoutMs: 60_000 })).live;
+}
+
+export async function descoLogin(username, password) {
+  const res = await requestJson('/api/desco/login', { method: 'POST', body: { username, password }, timeoutMs: 75_000 });
+  setDescoAuth({ token: res.token, username, accounts: res.accounts || [] });
+  return res.accounts || [];
+}
+
+export async function descoLogout() {
+  try {
+    await requestJson('/api/desco/logout', { method: 'POST', body: {} });
+  } catch {
+    /* sign out locally regardless */
+  }
+  setDescoAuth(null);
+}
+
+export async function descoAccounts() {
+  return (await requestJson('/api/desco/accounts')).accounts || [];
 }

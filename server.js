@@ -9,6 +9,8 @@ import { AppError, badRequest, notFound, rateLimited } from './src/errors.js';
 import { fetchDesco, fetchDescoNotices, requestRealtimeBalance } from './src/desco.js';
 import { fetchNesco } from './src/nesco.js';
 import { fetchDemo } from './src/demo.js';
+import { seal, unseal } from './src/auth.js';
+import { runWithClient, userClient, verifyLogin, dropUserClient, hasPersonalClient, credentials } from './src/desco-session.js';
 
 const PUBLIC_DIR = resolve(process.cwd(), 'public');
 const cache = createCache({ ttlMs: config.cacheTtlMs });
@@ -62,6 +64,47 @@ function rateLimit(key) {
   if (buckets.size > 10_000) buckets.clear();
   const retryAfter = Math.ceil((bucket.resetAt - now) / 1000);
   return { allowed: bucket.count <= config.rateLimitPerMinute, retryAfter };
+}
+
+// Sign-in attempts are limited harder: the server must not become a password-guessing tool.
+const loginBuckets = new Map();
+
+function loginAllowed(ip) {
+  const now = Date.now();
+  const windowMs = 15 * 60_000;
+  const bucket = loginBuckets.get(ip) || { count: 0, resetAt: now + windowMs };
+  if (bucket.resetAt <= now) {
+    bucket.count = 0;
+    bucket.resetAt = now + windowMs;
+  }
+  bucket.count += 1;
+  loginBuckets.set(ip, bucket);
+  if (loginBuckets.size > 5_000) loginBuckets.clear();
+  return { allowed: bucket.count <= 10, retryAfter: Math.ceil((bucket.resetAt - now) / 1000) };
+}
+
+function readJsonBody(req, maxBytes = 4096) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        reject(badRequest('Request too large.'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
+      } catch {
+        reject(badRequest('Request body must be JSON.'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 /* --------------------------------- helpers -------------------------------- */
@@ -118,6 +161,33 @@ async function handleApi(req, res, url) {
   const limit = rateLimit(clientIp(req));
   if (!limit.allowed) throw rateLimited(limit.retryAfter);
 
+  // A person signed in with their own DESCO account: use that account for this request.
+  const header = req.headers['x-desco-auth'];
+  if (header) {
+    const creds = unseal(header);
+    if (!creds) {
+      throw new AppError('DESCO_AUTH_INVALID', 'Your DESCO sign-in is no longer valid. Please sign in again.', {
+        status: 401,
+        retryable: false,
+      });
+    }
+    try {
+      return await runWithClient(userClient(creds), () => routes(req, res, url));
+    } catch (error) {
+      if (error?.code === 'DESCO_LOGIN_FAILED') {
+        dropUserClient(creds);
+        throw new AppError('DESCO_AUTH_EXPIRED', 'Your DESCO password changed or expired. Please sign in again.', {
+          status: 401,
+          retryable: false,
+        });
+      }
+      throw error;
+    }
+  }
+  return routes(req, res, url);
+}
+
+async function routes(req, res, url) {
   const segments = url.pathname.split('/').filter(Boolean); // ['api', ...]
 
   if (url.pathname === '/api/health') {
@@ -146,6 +216,47 @@ async function handleApi(req, res, url) {
       meta: { ...(fetchDemo(provider, accountNo).meta || {}), cached: false, cacheTtlSeconds: 0 },
     };
     sendJson(res, 200, { ok: true, account });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/desco/login') {
+    if (req.headers['x-requested-with'] !== 'PrepaidPro') throw badRequest('Missing request header.');
+    if (config.demoMode) throw badRequest('Sign-in is not available in demo mode.');
+    const attempt = loginAllowed(clientIp(req));
+    if (!attempt.allowed) throw rateLimited(attempt.retryAfter);
+    const body = await readJsonBody(req);
+    const username = String(body.username || '').trim();
+    const password = String(body.password || '');
+    if (username.length < 3 || username.length > 64 || !password || password.length > 128) {
+      throw badRequest('Enter your DESCO mobile number and password.');
+    }
+    let accounts;
+    try {
+      accounts = await verifyLogin({ username, password });
+    } catch (error) {
+      if (error?.code === 'DESCO_LOGIN_FAILED') {
+        throw new AppError('DESCO_LOGIN_FAILED', error.message, { status: 401, retryable: false });
+      }
+      throw error;
+    }
+    sendJson(res, 200, { ok: true, token: seal({ username, password }), accounts });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/desco/logout') {
+    const creds = unseal(req.headers['x-desco-auth']);
+    if (creds) dropUserClient(creds);
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  if (url.pathname === '/api/desco/accounts') {
+    const creds = unseal(req.headers['x-desco-auth']);
+    if (!creds) {
+      throw new AppError('DESCO_AUTH_INVALID', 'Please sign in with your DESCO account.', { status: 401, retryable: false });
+    }
+    const accounts = await verifyLogin(creds);
+    sendJson(res, 200, { ok: true, accounts });
     return true;
   }
 
@@ -182,6 +293,12 @@ async function handleApi(req, res, url) {
     const accountNo = decodeURIComponent(segments[3]).replace(/\D/g, '');
     if (accountNo.length < 5 || accountNo.length > 16) {
       throw badRequest('The account or meter number must contain 5 to 16 digits.');
+    }
+    if (provider === 'desco' && !config.demoMode && !hasPersonalClient() && !credentials()) {
+      throw new AppError('DESCO_LOGIN_REQUIRED', 'Sign in with your DESCO account to see this meter.', {
+        status: 401,
+        retryable: false,
+      });
     }
     const refresh = ['1', 'true', 'yes'].includes(String(url.searchParams.get('refresh')).toLowerCase());
     const account = await loadCachedMeter(provider, accountNo, refresh);
@@ -292,7 +409,8 @@ const server = createServer(async (req, res) => {
   });
 
   const isRealtime = req.method === 'POST' && /^\/api\/meter\/desco\/\d+\/realtime$/.test(url.pathname);
-  if (!['GET', 'HEAD'].includes(req.method) && !isRealtime) {
+  const isDescoAuth = req.method === 'POST' && /^\/api\/desco\/(login|logout)$/.test(url.pathname);
+  if (!['GET', 'HEAD'].includes(req.method) && !isRealtime && !isDescoAuth) {
     sendJson(res, 405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } });
     return;
   }

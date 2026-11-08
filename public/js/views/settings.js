@@ -3,6 +3,7 @@ import { h, icon, card, openModal, closeModal, toast, download } from '../ui.js'
 import { updateSettings, clearAll, exportAll, importAll } from '../state.js';
 import { formatMoney, formatDate } from '../format.js';
 import { languages } from '../i18n.js';
+import { getDescoAuth, descoLogout } from '../api.js';
 
 function settingRow({ label, desc, control }) {
   return h(
@@ -36,6 +37,31 @@ export function renderSettings(ctx) {
   const settings = state.settings;
   const demoMode = Boolean(ctx.serverConfig?.demoMode);
   const version = ctx.serverConfig?.version || '1.0.0';
+
+  const auth = getDescoAuth();
+  const descoCard = card({
+    title: t('dlogin.title'),
+    subtitle: auth ? t('dlogin.signedInAs', { user: auth.username }) : t('dlogin.subtitle'),
+    body: h(
+      'div',
+      { class: 'row' },
+      auth
+        ? h(
+            'button',
+            {
+              class: 'btn',
+              type: 'button',
+              onclick: async () => {
+                await descoLogout();
+                toast(t('dlogin.signedOut'));
+                ctx.renderView();
+              },
+            },
+            t('dlogin.signOut'),
+          )
+        : h('button', { class: 'btn primary', type: 'button', onclick: () => ctx.navigate('desco-login') }, t('dlogin.signIn')),
+    ),
+  });
 
   const languageCard = card({
     title: t('settings.appearance'),
@@ -452,6 +478,7 @@ export function renderSettings(ctx) {
           ),
         )
       : null,
+    demoMode ? null : descoCard,
     h('div', { class: 'grid cols-2', style: { alignItems: 'start' } }, languageCard, alertsCard),
     dataCard,
     aboutCard,

@@ -29,6 +29,10 @@ export function publicConfig() {
     appName: config.appName,
     version: config.version,
     demoMode: config.demoMode,
+    descoLogin: {
+      persistent: Boolean(process.env.SESSION_SECRET),
+      sharedFallback: Boolean((process.env.DESCO_USERNAME || '').trim() && process.env.DESCO_PASSWORD),
+    },
     providers: [
       { id: 'desco', name: 'DESCO', fullName: 'Dhaka Electric Supply Company' },
       { id: 'nesco', name: 'NESCO', fullName: 'Northern Electricity Supply Company' },

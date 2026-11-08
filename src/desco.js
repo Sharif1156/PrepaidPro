@@ -2,7 +2,7 @@ import { requestJson } from './http.js';
 import { AppError, accountNotFound, badRequest, upstreamError } from './errors.js';
 import { config } from './config.js';
 import { randomUUID } from 'node:crypto';
-import { api, accountIdFor, credentials, descoBase } from './desco-session.js';
+import { api, accountIdFor, credentials, descoBase, hasPersonalClient } from './desco-session.js';
 
 /**
  * DESCO exposes two generations of the same public API:
@@ -417,7 +417,9 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
  * Without them, fall back to the old public endpoints.
  */
 export function fetchDesco(accountNo, options) {
-  return credentials() ? fetchDescoSession(accountNo, options) : fetchDescoPublic(accountNo, options);
+  return credentials() || hasPersonalClient()
+    ? fetchDescoSession(accountNo, options)
+    : fetchDescoPublic(accountNo, options);
 }
 
 /* ------------------------- daily usage and token lists ------------------------ */
@@ -502,8 +504,8 @@ const realtimeLast = new Map();
  */
 export async function requestRealtimeBalance(accountNo) {
   const account = validateAccountNo(accountNo);
-  if (!credentials()) {
-    throw new AppError('DESCO_LOGIN_MISSING', 'The server has no DESCO login configured.', { status: 503, retryable: false });
+  if (!credentials() && !hasPersonalClient()) {
+    throw new AppError('DESCO_LOGIN_MISSING', 'Sign in with your DESCO account first.', { status: 503, retryable: false });
   }
   const last = realtimeLast.get(account) || 0;
   const wait = last + REALTIME_GAP_MS - Date.now();
