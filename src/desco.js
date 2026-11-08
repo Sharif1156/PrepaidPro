@@ -1,7 +1,8 @@
 import { requestJson } from './http.js';
-import { accountNotFound, badRequest, upstreamError } from './errors.js';
+import { AppError, accountNotFound, badRequest, upstreamError } from './errors.js';
 import { config } from './config.js';
-import { api, accountIdFor, credentials } from './desco-session.js';
+import { randomUUID } from 'node:crypto';
+import { api, accountIdFor, credentials, descoBase } from './desco-session.js';
 
 /**
  * DESCO exposes two generations of the same public API:
@@ -359,12 +360,15 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
   const id = await accountIdFor(account);
   const base = `/api/accounts/${encodeURIComponent(id)}`;
 
-  const [balancePayload, summaryPayload, monthlyPayload, transactionPayload] = await Promise.all([
-    api(`${base}/balance`),
-    trySession(`${base}/summary`),
-    trySession(`${base}/usage/monthly`, monthRange(11)),
-    trySession(`${base}/transactions`, dateRange(historyDays)),
-  ]);
+  const [balancePayload, summaryPayload, monthlyPayload, transactionPayload, dailyPayload, tokenPayload] =
+    await Promise.all([
+      api(`${base}/balance`),
+      trySession(`${base}/summary`),
+      trySession(`${base}/usage/monthly`, monthRange(11)),
+      trySession(`${base}/transactions`, dateRange(historyDays)),
+      trySession(`${base}/usage/daily`, dateRange(30)),
+      trySession(`${base}/tokens`, dateRange(historyDays)),
+    ]);
 
   const balanceIndex = indexKeys(toObject(balancePayload?.data ?? balancePayload));
   const infoIndex = summaryPayload.__error
@@ -373,6 +377,8 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
   const customer = normalizeCustomer(infoIndex);
   const monthly = monthlyPayload.__error ? [] : normalizeMonthly(rowsOf(monthlyPayload));
   const recharges = transactionPayload.__error ? [] : normalizeRecharges(rowsOf(transactionPayload));
+  const daily = dailyPayload.__error ? [] : normalizeDaily(rowsOf(dailyPayload));
+  const tokens = tokenPayload.__error ? [] : normalizeTokens(rowsOf(tokenPayload));
 
   const balance = pickNumber(balanceIndex, BALANCE_KEYS);
   if (balance === null) throw accountNotFound('DESCO');
@@ -399,8 +405,10 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
         },
     monthly,
     recharges,
+    daily,
+    tokens,
     fetchedAt: new Date().toISOString(),
-    meta: { historyDays, refresh },
+    meta: { historyDays, refresh, stale: balancePayload?.stale === true },
   };
 }
 
@@ -410,4 +418,129 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
  */
 export function fetchDesco(accountNo, options) {
   return credentials() ? fetchDescoSession(accountNo, options) : fetchDescoPublic(accountNo, options);
+}
+
+/* ------------------------- daily usage and token lists ------------------------ */
+
+function normalizeDaily(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const index = indexKeys(toObject(row));
+      const raw = pickString(index, ['date', 'day', 'usagedate', 'consumptiondate', 'readingdate', 'consumeddate']);
+      const iso = parseBdDate(raw);
+      if (!iso) return null;
+      return {
+        date: String(iso).slice(0, 10),
+        unit: pickNumber(index, ['consumedunit', 'consumptionunit', 'unit', 'totalunit', 'consumedkwh', 'kwh', 'energykwh', 'consumedenergy']),
+        taka: pickNumber(index, ['consumedtaka', 'consumptiontaka', 'taka', 'amount', 'bill', 'totalamount']),
+      };
+    })
+    .filter((row) => row && /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normalizeTokens(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const index = indexKeys(toObject(row));
+      return {
+        date: parseBdDate(
+          pickString(index, ['tokendate', 'issuedat', 'rechargedate', 'transactiondate', 'transactiontime', 'createdat', 'date', 'timestamp']),
+        ),
+        tokenNo: pickString(index, ['tokenno', 'token', 'tokennumber', 'tokenvalue', 'tokencode']),
+        amount: pickNumber(index, ['totalamount', 'rechargeamount', 'amount', 'paidamount', 'grossamount']),
+        unit: pickNumber(index, ['tokenunit', 'unit', 'units', 'kwh', 'energy', 'energykwh']),
+      };
+    })
+    .filter((row) => row.tokenNo)
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+}
+
+/* ------------------------------ DESCO notices ------------------------------ */
+
+function noticeWindowOpen(item, now) {
+  const starts = item.startsAt ? Date.parse(item.startsAt) : null;
+  const ends = item.endsAt ? Date.parse(item.endsAt) : null;
+  return !(starts && now < starts) && !(ends && now > ends);
+}
+
+/** Public announcements from the DESCO portal (no login needed). */
+export async function fetchDescoNotices() {
+  const base = descoBase();
+  const [active, homepage] = await Promise.all([
+    requestJson(`${base}/api/public/notices/active`, { timeoutMs: 12_000 }).catch(() => []),
+    requestJson(`${base}/api/public/notices/homepage`, { timeoutMs: 12_000 }).catch(() => []),
+  ]);
+  const now = Date.now();
+  const seen = new Set();
+  const list = [];
+  for (const item of [...rowsOf(homepage), ...rowsOf(active)]) {
+    if (!item || typeof item !== 'object' || !item.title || !noticeWindowOpen(item, now)) continue;
+    const id = String(item.id ?? item.title);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    list.push({
+      id,
+      title: String(item.title).slice(0, 200),
+      body: String(item.body || '').slice(0, 2500),
+      priority: String(item.priority || 'NORMAL').toUpperCase(),
+      updatedAt: item.updatedAt || item.startsAt || null,
+    });
+  }
+  const rank = { EMERGENCY: 0, HIGH: 1, NORMAL: 2 };
+  return list.sort((a, b) => (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3)).slice(0, 5);
+}
+
+/* --------------------------- realtime meter balance --------------------------- */
+
+const REALTIME_GAP_MS = 60 * 60 * 1000; // the portal itself allows only 3 per meter per day
+const realtimeLast = new Map();
+
+/**
+ * Ask the meter itself for its balance right now. The portal limits this to a
+ * few requests a day per meter, so we also wait an hour between our own calls.
+ */
+export async function requestRealtimeBalance(accountNo) {
+  const account = validateAccountNo(accountNo);
+  if (!credentials()) {
+    throw new AppError('DESCO_LOGIN_MISSING', 'The server has no DESCO login configured.', { status: 503, retryable: false });
+  }
+  const last = realtimeLast.get(account) || 0;
+  const wait = last + REALTIME_GAP_MS - Date.now();
+  if (wait > 0) {
+    throw new AppError(
+      'REALTIME_COOLDOWN',
+      `The meter was asked a moment ago. Try again in ${Math.ceil(wait / 60_000)} minutes.`,
+      { status: 429, retryable: false, details: { retryAfterSeconds: Math.ceil(wait / 1000) } },
+    );
+  }
+  const id = await accountIdFor(account);
+  let result;
+  try {
+    result = await api(`/api/accounts/${encodeURIComponent(id)}/realtime-balance`, {
+      method: 'POST',
+      body: { idempotencyKey: randomUUID() },
+      timeoutMs: 40_000,
+    });
+  } catch (error) {
+    if (error?.code === 'UPSTREAM_HTTP_ERROR') {
+      throw new AppError(
+        'REALTIME_REFUSED',
+        error.details?.message || 'The portal did not allow a live meter reading right now.',
+        { status: 409, retryable: false, details: error.details },
+      );
+    }
+    throw error;
+  }
+  realtimeLast.set(account, Date.now());
+  const index = indexKeys(toObject(result));
+  const balance = pickNumber(index, BALANCE_KEYS);
+  if (balance === null) {
+    throw new AppError('REALTIME_REFUSED', 'The meter did not send a balance. Try again later.', { status: 409, retryable: false });
+  }
+  return {
+    balance,
+    readingTime: parseBdDate(pickString(index, ['receivedat', 'readingtime', 'requestedat'])),
+    remainingAttempts: pickNumber(index, ['remainingattempts']),
+  };
 }

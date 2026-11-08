@@ -1,7 +1,57 @@
-import { h, icon, card, stat } from '../ui.js';
+import { h, icon, card, stat, toast } from '../ui.js';
 import { formatMoney, formatNumber, formatMonth, formatDate, formatDuration } from '../format.js';
 import { barChart, areaChart, chartDims } from '../charts.js';
 import { monthToDate, estimateDailyCost, rechargePattern, dailySeries } from '../lib/forecast.js';
+
+function copyToken(ctx, tokenNo) {
+  const done = () => toast(ctx.t('tokens.copied'), tokenNo);
+  try {
+    navigator.clipboard.writeText(tokenNo).then(done, () => toast(tokenNo, ctx.t('tokens.copyManually')));
+  } catch {
+    toast(tokenNo, ctx.t('tokens.copyManually'));
+  }
+}
+
+function tokensCard(ctx, account) {
+  const { t, lang } = ctx;
+  const rows = (account.tokens?.length
+    ? account.tokens
+    : (account.recharges || []).filter((row) => row.tokenNo)
+  ).slice(0, 10);
+  if (!rows.length) return null;
+  return card({
+    title: t('tokens.title'),
+    subtitle: t('tokens.sub'),
+    body: h(
+      'div',
+      { class: 'list' },
+      ...rows.map((row) =>
+        h(
+          'div',
+          { class: 'list-row' },
+          h('span', { class: 'list-icon' }, icon('zap', { size: 16 })),
+          h(
+            'div',
+            { class: 'list-main' },
+            h('p', { class: 'list-title', style: { fontFamily: 'var(--mono, monospace)', wordBreak: 'break-all' } }, row.tokenNo),
+            h('p', { class: 'list-sub' }, row.date ? formatDate(row.date, lang, { short: true, withTime: true }) : '--'),
+          ),
+          h(
+            'div',
+            { class: 'list-amount' },
+            row.amount !== null && row.amount !== undefined ? formatMoney(row.amount, lang) : '',
+            row.unit ? h('small', {}, `${formatNumber(row.unit, lang)} kWh`) : null,
+          ),
+          h(
+            'button',
+            { class: 'btn sm ghost', type: 'button', 'aria-label': t('tokens.copy'), onclick: () => copyToken(ctx, row.tokenNo) },
+            icon('copy', { size: 14 }),
+          ),
+        ),
+      ),
+    ),
+  });
+}
 
 let range = 12;
 let metric = 'taka';
@@ -97,7 +147,9 @@ export function renderUsage(ctx) {
     }`,
   }));
 
-  const daily = dailySeries(account, { days: 60 }).map((point) => ({
+  const realDaily = Array.isArray(account.daily) && account.daily.filter((row) => typeof row.taka === 'number').length >= 5;
+  const dailyRows = realDaily ? account.daily.filter((row) => typeof row.taka === 'number') : dailySeries(account, { days: 60 });
+  const daily = dailyRows.map((point) => ({
     label: formatDate(point.date, lang, { short: true }),
     fullLabel: formatDate(point.date, lang, { short: false }),
     value: point.taka,
@@ -193,8 +245,8 @@ export function renderUsage(ctx) {
       'div',
       { class: 'grid cols-2' },
       card({
-        title: t('usage.daily'),
-        subtitle: t('usage.dailySub'),
+        title: realDaily ? t('usage.dailyRealTitle') : t('usage.daily'),
+        subtitle: realDaily ? t('usage.dailyRealSub') : t('usage.dailySub'),
         body: daily.length
           ? areaChart({
               data: daily,
@@ -203,7 +255,7 @@ export function renderUsage(ctx) {
               formatValue: (value) => formatMoney(value, lang),
             })
           : h('div', { class: 'chart-empty' }, t('usage.noData')),
-        footer: t('usage.estimateNote'),
+        footer: realDaily ? t('usage.dailyReal') : t('usage.estimateNote'),
       }),
       card({
         title: t('usage.pattern'),
@@ -265,6 +317,8 @@ export function renderUsage(ctx) {
           : null,
       }),
     ),
+
+    tokensCard(ctx, account),
 
     card({
       title: t('usage.monthly') + ' · ' + t('common.summary'),

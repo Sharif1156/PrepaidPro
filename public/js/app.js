@@ -9,7 +9,7 @@ import {
   setActiveMeter,
   removeMeter,
 } from './state.js';
-import { fetchMeter, ApiError, fetchServerConfig } from './api.js';
+import { fetchMeter, ApiError, fetchServerConfig, fetchNotices, requestRealtime } from './api.js';
 import { t, setLang, applyStaticTranslations } from './i18n.js';
 import { formatMoney, formatTimeAgo, formatDuration } from './format.js';
 import { icon, h, mount, toast, openModal, closeModal } from './ui.js';
@@ -43,6 +43,8 @@ const runtime = {
   serverConfig: null,
   prefetched: false,
   staleRetries: 0,
+  notices: [],
+  realtimeBusy: false,
 };
 
 let currentRoute = 'dashboard';
@@ -288,6 +290,69 @@ function updateStatus() {
 function currentKey() {
   const meter = activeMeter();
   return meter ? `${meter.provider}:${meter.accountNo}` : null;
+}
+
+
+/* ------------------------------ DESCO notices ------------------------------ */
+
+const NOTICES_KEY = 'prepaidpro:notices-read';
+
+function readNotices() {
+  try {
+    return JSON.parse(localStorage.getItem(NOTICES_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+
+function visibleNotices() {
+  const read = readNotices();
+  return runtime.notices.filter((notice) => read[notice.id] !== (notice.updatedAt || '1'));
+}
+
+function dismissNotice(notice) {
+  try {
+    localStorage.setItem(NOTICES_KEY, JSON.stringify({ ...readNotices(), [notice.id]: notice.updatedAt || '1' }));
+  } catch {
+    /* ignore */
+  }
+  renderView();
+}
+
+async function loadNotices() {
+  if (!state.meters.some((meter) => meter.provider === 'desco' && !meter.demo)) return;
+  runtime.notices = await fetchNotices();
+  if (currentRoute === 'dashboard') renderView();
+}
+
+/* ---------------------- live reading straight from the meter ---------------------- */
+
+async function readMeterNow() {
+  const meter = activeMeter();
+  if (!meter || meter.provider !== 'desco' || meter.demo || runtime.realtimeBusy) return;
+  const key = `${meter.provider}:${meter.accountNo}`;
+  runtime.realtimeBusy = true;
+  renderView();
+  try {
+    const live = await requestRealtime(meter.provider, meter.accountNo);
+    if (currentKey() === key && runtime.account) {
+      runtime.account = {
+        ...runtime.account,
+        balance: live.balance,
+        readingTime: live.readingTime || runtime.account.readingTime,
+        meta: { ...(runtime.account.meta || {}), live: true },
+      };
+      runtime.fromSnapshot = false;
+      saveSnapshot(meter, runtime.account);
+      maybeNotify(meter, runtime.account);
+    }
+    toast(t('dashboard.liveReadingDone'), formatMoney(live.balance, state.settings.lang));
+  } catch (error) {
+    toast(t('dashboard.liveReadingFailed'), String(error?.message || ''), { type: 'warn', timeout: 9000 });
+  } finally {
+    runtime.realtimeBusy = false;
+    renderView();
+  }
 }
 
 async function loadActive({ refresh = false, silent = false } = {}) {
@@ -762,6 +827,14 @@ const ctx = {
   get serverConfig() {
     return runtime.serverConfig;
   },
+  get notices() {
+    return visibleNotices();
+  },
+  get realtimeBusy() {
+    return runtime.realtimeBusy;
+  },
+  dismissNotice,
+  readMeterNow,
   get t() {
     return t;
   },
@@ -895,6 +968,8 @@ async function boot() {
     runtime.serverConfig = config;
     if (config?.demoMode) console.info('PrepaidPro is running in demo mode.');
   });
+
+  loadNotices();
 
   if (state.meters.length) {
     await loadActive();

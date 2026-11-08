@@ -101,6 +101,23 @@ export function demoProfile(provider, accountNo) {
   }
   recharges.sort((a, b) => b.date.localeCompare(a.date));
 
+  const daily = [];
+  for (let back = 29; back >= 0; back -= 1) {
+    const date = new Date(now.getTime() - back * 86_400_000);
+    const taka = Math.round((baseMonthly / 30) * (0.6 + random() * 0.9));
+    daily.push({
+      date: `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`,
+      unit: Math.round((taka / tariff) * 10) / 10,
+      taka,
+    });
+  }
+  const tokens = recharges.slice(0, 8).map((row) => ({
+    date: row.date,
+    tokenNo: row.tokenNo,
+    amount: row.amount,
+    unit: row.energyAmount,
+  }));
+
   const balance = Math.round((260 + random() * 900) * 100) / 100;
   const readingTime = new Date(now.getTime() - Math.floor(random() * 8) * 3_600_000);
 
@@ -131,6 +148,8 @@ export function demoProfile(provider, accountNo) {
     },
     monthly,
     recharges,
+    daily,
+    tokens,
     forecastHint: { expectedMonthly, tariff },
     fetchedAt: new Date().toISOString(),
     meta: {

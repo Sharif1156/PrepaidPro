@@ -11,13 +11,14 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson(url, { timeoutMs = 45_000 } = {}) {
+async function requestJson(url, { timeoutMs = 45_000, method = 'GET', headers = {} } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
     response = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      method,
+      headers: { Accept: 'application/json', ...headers },
       signal: controller.signal,
       credentials: 'same-origin',
     });
@@ -82,4 +83,20 @@ export async function fetchServerConfig() {
 
 export function downloadUrl(provider, accountNo) {
   return `/api/meter/${encodeURIComponent(provider)}/${encodeURIComponent(accountNo)}?download=1`;
+}
+
+/** Public DESCO announcements (empty list when none or when the portal is unreachable). */
+export async function fetchNotices() {
+  try {
+    const payload = await requestJson('/api/notices', { timeoutMs: 12_000 });
+    return Array.isArray(payload.notices) ? payload.notices : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Ask the meter itself for its balance now (the portal allows only a few a day). */
+export async function requestRealtime(provider, accountNo) {
+  const url = `/api/meter/${encodeURIComponent(provider)}/${encodeURIComponent(accountNo)}/realtime`;
+  return (await requestJson(url, { method: 'POST', headers: { 'X-Requested-With': 'PrepaidPro' }, timeoutMs: 60_000 })).live;
 }

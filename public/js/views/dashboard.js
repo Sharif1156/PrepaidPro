@@ -61,6 +61,35 @@ function statusBanners(ctx, account) {
   return banners;
 }
 
+function noticeBanners(ctx) {
+  const { t } = ctx;
+  return (ctx.notices || []).map((notice) =>
+    h(
+      'div',
+      { class: `alert ${notice.priority === 'EMERGENCY' ? 'warn' : 'info'}`, style: { marginBottom: '16px' } },
+      icon('alert', { size: 18 }),
+      h(
+        'div',
+        { style: { flex: '1', minWidth: '0' } },
+        h('strong', {}, `${t('notices.title')}: ${notice.title}`),
+        notice.body
+          ? h(
+              'details',
+              {},
+              h('summary', { class: 'small', style: { cursor: 'pointer' } }, t('notices.read')),
+              h('p', { class: 'small', style: { whiteSpace: 'pre-line', marginTop: '8px' } }, notice.body),
+            )
+          : null,
+      ),
+      h(
+        'button',
+        { class: 'btn sm ghost', type: 'button', 'aria-label': t('notices.dismiss'), onclick: () => ctx.dismissNotice(notice) },
+        icon('x', { size: 14 }),
+      ),
+    ),
+  );
+}
+
 function errorCodeKey(error) {
   if (!error) return 'generic';
   if (error.code === 'OFFLINE' || error.code === 'NETWORK') return 'network';
@@ -249,6 +278,20 @@ function hero(ctx, account, meter, forecast) {
           t('dashboard.rechargeNow'),
           icon('arrowUpRight', { size: 13 }),
         ),
+        meter.provider === 'desco' && !meter.demo && !account.demo
+          ? h(
+              'button',
+              {
+                class: 'btn sm',
+                type: 'button',
+                disabled: ctx.realtimeBusy,
+                title: t('dashboard.liveReadingHint'),
+                onclick: () => ctx.readMeterNow(),
+              },
+              icon('gauge', { size: 14 }),
+              ctx.realtimeBusy ? t('dashboard.liveReadingBusy') : t('dashboard.liveReading'),
+            )
+          : null,
         h(
           'button',
           { class: 'btn sm', type: 'button', onclick: () => ctx.go('insights') },
@@ -530,6 +573,7 @@ export function renderDashboard(ctx) {
   return h(
     'div',
     {},
+    ...noticeBanners(ctx),
     ...statusBanners(ctx, account),
     h(
       'div',

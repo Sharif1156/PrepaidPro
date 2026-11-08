@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { config, publicConfig } from './src/config.js';
 import { createCache } from './src/cache.js';
 import { AppError, badRequest, notFound, rateLimited } from './src/errors.js';
-import { fetchDesco } from './src/desco.js';
+import { fetchDesco, fetchDescoNotices, requestRealtimeBalance } from './src/desco.js';
 import { fetchNesco } from './src/nesco.js';
 import { fetchDemo } from './src/demo.js';
 
@@ -149,6 +149,34 @@ async function handleApi(req, res, url) {
     return true;
   }
 
+  if (url.pathname === '/api/notices') {
+    if (config.demoMode) {
+      sendJson(res, 200, { ok: true, notices: [] });
+      return true;
+    }
+    const result = await cache.wrap('notices:desco', () => fetchDescoNotices(), 15 * 60 * 1000, {
+      staleMs: 6 * 60 * 60 * 1000,
+    });
+    sendJson(res, 200, { ok: true, notices: result.value });
+    return true;
+  }
+
+  if (req.method === 'POST' && segments[1] === 'meter' && segments[4] === 'realtime') {
+    // A custom header cannot be sent by another website's form or script, so
+    // only this app can trigger a (limited) live meter reading.
+    if (req.headers['x-requested-with'] !== 'PrepaidPro') throw badRequest('Missing request header.');
+    if (config.demoMode) throw badRequest('Live meter readings are not available in demo mode.');
+    const accountNo = decodeURIComponent(segments[3]).replace(/\D/g, '');
+    const live = await requestRealtimeBalance(accountNo);
+    const key = `meter:desco:${accountNo}`;
+    const cached = cache.get(key);
+    if (cached) {
+      cache.set(key, { ...cached, balance: live.balance, readingTime: live.readingTime || cached.readingTime }, config.cacheTtlMs, STALE_WINDOW_MS);
+    }
+    sendJson(res, 200, { ok: true, live });
+    return true;
+  }
+
   if (segments[1] === 'meter' && segments.length >= 4) {
     const provider = normalizeProvider(segments[2]);
     const accountNo = decodeURIComponent(segments[3]).replace(/\D/g, '');
@@ -263,7 +291,8 @@ const server = createServer(async (req, res) => {
     }
   });
 
-  if (!['GET', 'HEAD'].includes(req.method)) {
+  const isRealtime = req.method === 'POST' && /^\/api\/meter\/desco\/\d+\/realtime$/.test(url.pathname);
+  if (!['GET', 'HEAD'].includes(req.method) && !isRealtime) {
     sendJson(res, 405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } });
     return;
   }
