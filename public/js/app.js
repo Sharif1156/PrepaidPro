@@ -8,6 +8,7 @@ import {
   getSnapshot,
   setActiveMeter,
   removeMeter,
+  clearDescoSnapshots,
 } from './state.js';
 import { fetchMeter, ApiError, fetchServerConfig, fetchNotices, requestRealtime } from './api.js';
 import { t, setLang, applyStaticTranslations } from './i18n.js';
@@ -711,6 +712,17 @@ function startDemo() {
   return meter;
 }
 
+function afterSignOut() {
+  clearDescoSnapshots();
+  runtime.account = null;
+  runtime.error = null;
+  runtime.lastKey = null;
+  runtime.fromSnapshot = false;
+  runtime.meterSummaries = {};
+  navigate('dashboard');
+  loadActive();
+}
+
 function openAddMeter(options = {}) {
   import('./views/meters.js').then(({ openAddMeterModal }) => {
     openAddMeterModal(ctx, options);
@@ -851,6 +863,7 @@ const ctx = {
   loadActive,
   loadAllSummaries,
   openAddMeter,
+  afterSignOut,
   startDemo,
   confirmRemoveMeter,
   setActiveMeter,

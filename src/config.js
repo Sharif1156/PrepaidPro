@@ -1,3 +1,4 @@
+import { credentials } from './desco-session.js';
 import { sessionSecretIsSet } from './auth.js';
 const number = (value, fallback) => {
   const parsed = Number(value);
@@ -32,7 +33,7 @@ export function publicConfig() {
     demoMode: config.demoMode,
     descoLogin: {
       persistent: sessionSecretIsSet(),
-      sharedFallback: Boolean((process.env.DESCO_USERNAME || '').trim() && process.env.DESCO_PASSWORD),
+      sharedFallback: Boolean(credentials()),
     },
     providers: [
       { id: 'desco', name: 'DESCO', fullName: 'Dhaka Electric Supply Company' },

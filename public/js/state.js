@@ -154,6 +154,15 @@ export function snapshotKey(meter) {
   return `${meter.provider}:${meter.accountNo}`;
 }
 
+/** Forget saved DESCO readings (not demo ones) so a signed-out device shows nothing private. */
+export function clearDescoSnapshots() {
+  const snapshots = { ...state.snapshots };
+  for (const meter of state.meters) {
+    if (meter.provider === 'desco' && !meter.demo) delete snapshots[snapshotKey(meter)];
+  }
+  setState({ snapshots });
+}
+
 export function saveSnapshot(meter, account) {
   const key = snapshotKey(meter);
   const snapshots = {

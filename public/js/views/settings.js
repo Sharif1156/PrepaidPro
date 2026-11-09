@@ -54,7 +54,7 @@ export function renderSettings(ctx) {
               onclick: async () => {
                 await descoLogout();
                 toast(t('dlogin.signedOut'));
-                ctx.renderView();
+                ctx.afterSignOut();
               },
             },
             t('dlogin.signOut'),

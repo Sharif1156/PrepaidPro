@@ -22,8 +22,13 @@ export function descoBase() {
   return (process.env.DESCO_BASE || 'https://prepaid.desco.org.bd').replace(/\/+$/, '');
 }
 
-/** The optional shared login from the server's environment. */
+/**
+ * The optional shared login from the server's environment. Off unless
+ * ALLOW_SHARED_LOGIN=1: by default every visitor must use their own DESCO
+ * account, so the owner's account never carries other people's traffic.
+ */
 export function credentials() {
+  if (!['1', 'true', 'yes'].includes(String(process.env.ALLOW_SHARED_LOGIN || '').toLowerCase())) return null;
   const username = (process.env.DESCO_USERNAME || '').trim();
   const password = process.env.DESCO_PASSWORD || '';
   return username && password ? { username, password } : null;

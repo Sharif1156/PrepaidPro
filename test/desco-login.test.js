@@ -183,3 +183,18 @@ test('too many sign-in attempts are slowed down', async () => {
   for (let i = 0; i < 12; i += 1) last = await login('01733333333', 'x');
   assert.equal(last.status, 429);
 });
+
+test('a shared DESCO login in the environment is ignored unless explicitly allowed', async () => {
+  const { credentials } = await import('../src/desco-session.js');
+  const saved = { ...process.env };
+  process.env.DESCO_USERNAME = '01700000000';
+  process.env.DESCO_PASSWORD = 'secret';
+  delete process.env.ALLOW_SHARED_LOGIN;
+  assert.equal(credentials(), null);
+  process.env.ALLOW_SHARED_LOGIN = '1';
+  assert.deepEqual(credentials(), { username: '01700000000', password: 'secret' });
+  for (const key of ['DESCO_USERNAME', 'DESCO_PASSWORD', 'ALLOW_SHARED_LOGIN']) {
+    if (saved[key] === undefined) delete process.env[key];
+    else process.env[key] = saved[key];
+  }
+});

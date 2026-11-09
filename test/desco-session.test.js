@@ -131,6 +131,7 @@ beforeEach(() => {
   realtimeRefuse = false;
   resetSession();
   process.env.DESCO_USERNAME = '01700000000';
+  process.env.ALLOW_SHARED_LOGIN = '1';
   process.env.DESCO_PASSWORD = 'secret-pass';
 });
 
