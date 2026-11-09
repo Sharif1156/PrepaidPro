@@ -1,3 +1,4 @@
+import { ensureChain, descoTlsStatus } from './src/tls-chain.js';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -10,7 +11,7 @@ import { fetchDesco, fetchDescoNotices, requestRealtimeBalance } from './src/des
 import { fetchNesco } from './src/nesco.js';
 import { fetchDemo } from './src/demo.js';
 import { seal, unseal } from './src/auth.js';
-import { runWithClient, userClient, verifyLogin, dropUserClient, hasPersonalClient, credentials } from './src/desco-session.js';
+import { descoBase, runWithClient, userClient, verifyLogin, dropUserClient, hasPersonalClient, credentials } from './src/desco-session.js';
 
 const PUBLIC_DIR = resolve(process.cwd(), 'public');
 const cache = createCache({ ttlMs: config.cacheTtlMs });
@@ -196,6 +197,7 @@ async function routes(req, res, url) {
       app: config.appName,
       version: config.version,
       demoMode: config.demoMode,
+      descoTls: descoTlsStatus(),
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       cacheEntries: cache.size(),
       time: new Date().toISOString(),
@@ -439,6 +441,10 @@ const server = createServer(async (req, res) => {
     });
   }
 });
+
+if (!config.demoMode) {
+  ensureChain(new URL(descoBase()).hostname).then((result) => console.log(`  DESCO TLS: ${result}`));
+}
 
 server.listen(config.port, config.host, () => {
   console.log(`\n  ${config.appName} ${config.version}`);

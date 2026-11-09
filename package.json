@@ -21,7 +21,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server.js && node --check src/desco.js && node --check src/nesco.js && node --check src/demo.js && node --check src/desco-session.js && node --check src/auth.js && node --check src/portal-check.js && node --check scripts/portal-check.mjs"
+    "check": "node --check server.js && node --check src/desco.js && node --check src/nesco.js && node --check src/demo.js && node --check src/desco-session.js && node --check src/auth.js && node --check src/tls-chain.js && node --check src/portal-check.js && node --check scripts/portal-check.mjs"
   },
   "dependencies": {},
   "devDependencies": {}
