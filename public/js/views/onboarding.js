@@ -73,10 +73,22 @@ export function renderOnboarding(ctx) {
     h(
       'div',
       { class: 'welcome-hero' },
-      h('span', { class: 'welcome-logo' }, icon('zap', { size: 26 })),
-      h('div', {}, h('strong', {}, 'PrepaidPro'), h('span', {}, t('welcome.tag'))),
-      h('h1', {}, t('welcome.headline')),
+      h(
+        'div',
+        { class: 'welcome-brand' },
+        h('span', { class: 'welcome-logo' }, icon('zap', { size: 22 })),
+        h('div', {}, 'PrepaidPro', h('small', {}, t('welcome.tag'))),
+      ),
+      h('h1', {}, t('welcome.headline1'), ' ', h('em', {}, t('welcome.headline2'))),
       h('p', {}, t('welcome.sub')),
+      h(
+        'div',
+        { class: 'welcome-preview', 'aria-hidden': 'true' },
+        h('div', { class: 'row1' }, h('span', {}, t('welcome.previewLabel')), h('i', {}, 'LIVE')),
+        h('div', { class: 'amount' }, '৳1,240.50'),
+        h('div', { class: 'bar' }, h('b')),
+        h('div', { class: 'row2' }, h('span', {}, t('welcome.previewDays')), h('span', {}, '৳ 103 / day')),
+      ),
     ),
     h(
       'div',
