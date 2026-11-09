@@ -159,8 +159,12 @@ function normalizeProvider(value) {
 /* ---------------------------------- routes -------------------------------- */
 
 async function handleApi(req, res, url) {
-  const limit = rateLimit(clientIp(req));
-  if (!limit.allowed) throw rateLimited(limit.retryAfter);
+  // Cheap, cache-backed endpoints do not count: only meter lookups reach the utility.
+  const cheap = ['/api/health', '/api/config', '/api/notices', '/api/desco/logout'].includes(url.pathname);
+  if (!cheap) {
+    const limit = rateLimit(clientIp(req));
+    if (!limit.allowed) throw rateLimited(limit.retryAfter);
+  }
 
   // A person signed in with their own DESCO account: use that account for this request.
   const header = req.headers['x-desco-auth'];

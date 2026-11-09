@@ -14,7 +14,7 @@ export const config = {
   host: process.env.HOST || '0.0.0.0',
   cacheTtlMs: number(process.env.CACHE_TTL_SECONDS, 180) * 1000,
   historyDays: Math.min(number(process.env.HISTORY_DAYS, 335), 730),
-  rateLimitPerMinute: number(process.env.RATE_LIMIT_PER_MINUTE, 30),
+  rateLimitPerMinute: number(process.env.RATE_LIMIT_PER_MINUTE, 120),
   /**
    * DEMO_MODE answers every meter lookup with generated data. Useful for
    * screenshots, offline development and any environment that cannot reach

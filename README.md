@@ -126,7 +126,7 @@ All configuration is environment variables — there is no config file to edit.
 | `DEMO_MODE` | `0` | `1` serves generated demo data instead of live portals |
 | `CACHE_TTL_SECONDS` | `180` | How long a meter reading is reused |
 | `HISTORY_DAYS` | `335` | Recharge history window (max 730) |
-| `RATE_LIMIT_PER_MINUTE` | `30` | Per-IP request budget for `/api/*` |
+| `RATE_LIMIT_PER_MINUTE` | `120` | Per-IP request budget for `/api/*` |
 | `DESCO_USERNAME` | _(unset)_ | DESCO prepaid portal login (mobile number). Needed since the portal update: balances now require a signed-in account |
 | `DESCO_PASSWORD` | _(unset)_ | Password for that DESCO login. Keep it in the host's environment settings, never in the repo |
 
