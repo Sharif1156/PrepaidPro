@@ -158,7 +158,16 @@ export class DescoClient {
   async accountIdFor(accountNo) {
     if (this.linkedIds.has(accountNo)) return this.linkedIds.get(accountNo);
 
-    const list = await this.api('/api/accounts');
+    // Several meters load at once: share one account-list request between them.
+    if (!this.listPromise) {
+      this.listPromise = this.api('/api/accounts').finally(() => {
+        this.listPromise = null;
+      });
+    }
+    const list = await this.listPromise;
+    for (const item of list?.accounts || []) {
+      if (item?.accountId !== undefined) this.linkedIds.set(String(item.accountNo), item.accountId);
+    }
     const found = (list?.accounts || []).find((item) => String(item.accountNo) === accountNo);
     if (found?.accountId !== undefined) {
       this.linkedIds.set(accountNo, found.accountId);
@@ -223,7 +232,7 @@ export const accountIdFor = (accountNo) => currentClient().accountIdFor(accountN
 /* ---------------------------- signed-in people ---------------------------- */
 
 const MAX_CLIENTS = 200;
-const IDLE_MS = 30 * 60 * 1000;
+const IDLE_MS = 3 * 60 * 60 * 1000; // re-signing in to DESCO is the slowest step, so keep sessions warm
 const users = new Map(); // fingerprint -> client
 
 function sweep() {
@@ -232,7 +241,7 @@ function sweep() {
   while (users.size > MAX_CLIENTS) users.delete(users.keys().next().value);
 }
 
-/** The client for one person's own DESCO account (kept for 30 idle minutes). */
+/** The client for one person's own DESCO account (kept for 3 idle hours). */
 export function userClient(creds) {
   sweep();
   const key = fingerprint(creds);
@@ -254,6 +263,10 @@ export async function verifyLogin(creds) {
   try {
     await client.login();
     const list = await client.api('/api/accounts');
+    // Remember the ids now, so the first balance lookups skip the account-list call.
+    for (const item of list?.accounts || []) {
+      if (item?.accountId !== undefined) client.linkedIds.set(String(item.accountNo), item.accountId);
+    }
     return (list?.accounts || []).map((item) => ({
       accountNo: String(item.accountNo),
       meterNo: item.meterNo ? String(item.meterNo) : null,
