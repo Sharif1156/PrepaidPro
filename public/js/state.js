@@ -17,6 +17,8 @@ const defaultSettings = {
   alarmSound: true,
   // Active low-balance reminders, per meter id: { count, nextAt, muted }.
   alarms: {},
+  // Names and limits of DESCO meters, kept by account number across sign-out.
+  descoProfiles: {},
 };
 
 const listeners = new Set();
@@ -51,6 +53,7 @@ function load() {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     const meters = Array.isArray(raw?.meters) ? raw.meters.map(sanitizeMeter).filter(Boolean) : [];
     const settings = { ...defaultSettings, ...(raw?.settings || {}) };
+    if (!settings.descoProfiles || typeof settings.descoProfiles !== 'object' || Array.isArray(settings.descoProfiles)) settings.descoProfiles = {};
     if (!settings.alarms || typeof settings.alarms !== 'object' || Array.isArray(settings.alarms)) settings.alarms = {};
     if (!['en', 'bn'].includes(settings.lang)) settings.lang = 'en';
     if (!['dark', 'light', 'classic'].includes(settings.theme)) settings.theme = 'dark';
@@ -125,6 +128,10 @@ export function addMeter({ provider, accountNo, label = '', threshold = null, de
   return meter;
 }
 
+export function rememberedProfile(accountNo) {
+  return state.settings.descoProfiles?.[accountNo] || {};
+}
+
 export function removeMeter(id) {
   const meters = state.meters.filter((meter) => meter.id !== id);
   const activeMeterId =
@@ -159,13 +166,17 @@ export function purgeDescoMeters() {
   const gone = state.meters.filter((meter) => meter.provider === 'desco' && !meter.demo);
   if (!gone.length) return false;
   const ids = new Set(gone.map((meter) => meter.id));
+  const descoProfiles = { ...(state.settings.descoProfiles || {}) };
+  for (const meter of gone) {
+    if (meter.label || meter.threshold !== null) descoProfiles[meter.accountNo] = { label: meter.label || '', threshold: meter.threshold ?? null };
+  }
   const snapshots = { ...state.snapshots };
   for (const meter of gone) delete snapshots[snapshotKey(meter)];
   const alarms = { ...(state.settings.alarms || {}) };
   for (const id of ids) delete alarms[id];
   const meters = state.meters.filter((meter) => !ids.has(meter.id));
   const activeMeterId = ids.has(state.activeMeterId) ? meters[0]?.id || null : state.activeMeterId;
-  setState({ meters, snapshots, activeMeterId, settings: { ...state.settings, alarms } });
+  setState({ meters, snapshots, activeMeterId, settings: { ...state.settings, alarms, descoProfiles } });
   return true;
 }
 

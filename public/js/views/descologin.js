@@ -1,6 +1,6 @@
 import { h, icon, card, toast } from '../ui.js';
 import { descoLogin } from '../api.js';
-import { addMeter } from '../state.js';
+import { addMeter, rememberedProfile } from '../state.js';
 
 export function descoLoginForm(ctx) {
   const { t } = ctx;
@@ -26,7 +26,8 @@ export function descoLoginForm(ctx) {
             const no = String(a.accountNo || '').replace(/\D/g, '');
             if (no.length >= 5) {
               try {
-                addMeter({ provider: 'desco', accountNo: no, label: '' });
+                const saved = rememberedProfile(no);
+                addMeter({ provider: 'desco', accountNo: no, label: saved.label || '', threshold: saved.threshold ?? null });
                 added += 1;
               } catch {
                 /* skip invalid */
