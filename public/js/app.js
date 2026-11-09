@@ -8,9 +8,9 @@ import {
   getSnapshot,
   setActiveMeter,
   removeMeter,
-  clearDescoSnapshots,
+  purgeDescoMeters,
 } from './state.js';
-import { fetchMeter, ApiError, fetchServerConfig, fetchNotices, requestRealtime } from './api.js';
+import { getDescoAuth, fetchMeter, ApiError, fetchServerConfig, fetchNotices, requestRealtime } from './api.js';
 import { t, setLang, applyStaticTranslations } from './i18n.js';
 import { formatMoney, formatTimeAgo, formatDuration } from './format.js';
 import { icon, h, mount, toast, openModal, closeModal } from './ui.js';
@@ -713,14 +713,16 @@ function startDemo() {
 }
 
 function afterSignOut() {
-  clearDescoSnapshots();
+  purgeDescoMeters();
   runtime.account = null;
   runtime.error = null;
   runtime.lastKey = null;
   runtime.fromSnapshot = false;
   runtime.meterSummaries = {};
   navigate('dashboard');
-  loadActive();
+  renderChrome();
+  renderView();
+  if (state.meters.length) loadActive();
 }
 
 function openAddMeter(options = {}) {
@@ -984,6 +986,13 @@ async function boot() {
   fetchServerConfig().then((config) => {
     runtime.serverConfig = config;
     if (config?.demoMode) console.info('PrepaidPro is running in demo mode.');
+    // Signed out on a live server: show the welcome page, not leftover meters.
+    else if (!getDescoAuth() && purgeDescoMeters()) {
+      runtime.account = null;
+      runtime.lastKey = null;
+      renderChrome();
+      renderView();
+    }
   });
 
   loadNotices();

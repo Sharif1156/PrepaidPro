@@ -154,6 +154,21 @@ export function snapshotKey(meter) {
   return `${meter.provider}:${meter.accountNo}`;
 }
 
+/** Remove the DESCO meters (not demo ones) with their readings and reminders: used when signed out. */
+export function purgeDescoMeters() {
+  const gone = state.meters.filter((meter) => meter.provider === 'desco' && !meter.demo);
+  if (!gone.length) return false;
+  const ids = new Set(gone.map((meter) => meter.id));
+  const snapshots = { ...state.snapshots };
+  for (const meter of gone) delete snapshots[snapshotKey(meter)];
+  const alarms = { ...(state.settings.alarms || {}) };
+  for (const id of ids) delete alarms[id];
+  const meters = state.meters.filter((meter) => !ids.has(meter.id));
+  const activeMeterId = ids.has(state.activeMeterId) ? meters[0]?.id || null : state.activeMeterId;
+  setState({ meters, snapshots, activeMeterId, settings: { ...state.settings, alarms } });
+  return true;
+}
+
 /** Forget saved DESCO readings (not demo ones) so a signed-out device shows nothing private. */
 export function clearDescoSnapshots() {
   const snapshots = { ...state.snapshots };
