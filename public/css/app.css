@@ -2331,3 +2331,9 @@ body.welcome-mode { background:
 .dl-links { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
 .dl-links a { color: var(--accent); text-decoration: none; }
 .dl-links a:hover { text-decoration: underline; }
+
+/* Phones: scale the whole interface up a little so text is comfortable to read. */
+@media (max-width: 520px) {
+  body { zoom: 1.15; }
+  .toasts { right: 12px; left: 12px; max-width: none; }
+}
