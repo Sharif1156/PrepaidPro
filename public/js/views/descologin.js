@@ -2,7 +2,7 @@ import { h, icon, card, toast } from '../ui.js';
 import { descoLogin } from '../api.js';
 import { addMeter } from '../state.js';
 
-export function renderDescoLogin(ctx) {
+export function descoLoginForm(ctx) {
   const { t } = ctx;
   const user = h('input', { class: 'input', id: 'dlUser', autocomplete: 'username', inputmode: 'tel', maxlength: '64', required: true });
   const pass = h('input', { class: 'input', id: 'dlPass', type: 'password', autocomplete: 'current-password', maxlength: '128', required: true });
@@ -50,9 +50,14 @@ export function renderDescoLogin(ctx) {
     h('p', { class: 'small muted' }, t('dlogin.privacy')),
   );
 
+  return form;
+}
+
+export function renderDescoLogin(ctx) {
+  const { t } = ctx;
   return h(
     'div',
     { class: 'stack', style: { maxWidth: '460px', margin: '24px auto' } },
-    card({ title: t('dlogin.heading'), subtitle: t('dlogin.intro'), body: form }),
+    card({ title: t('dlogin.heading'), subtitle: t('dlogin.intro'), body: descoLoginForm(ctx) }),
   );
 }

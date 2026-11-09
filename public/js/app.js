@@ -773,7 +773,9 @@ function renderView() {
   const meter = activeMeter();
 
   let node;
-  if (!meter && currentRoute !== 'settings' && currentRoute !== 'desco-login') {
+  const welcome = !meter && currentRoute !== 'settings' && currentRoute !== 'desco-login';
+  document.body.classList.toggle('welcome-mode', welcome);
+  if (welcome) {
     node = renderOnboarding(ctx);
   } else {
     const render = VIEWS[currentRoute] || renderDashboard;

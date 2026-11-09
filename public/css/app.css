@@ -2276,3 +2276,39 @@ html[lang='bn'] .timeline-amount {
   border-color: rgba(255, 255, 255, 0.45);
 }
 [data-style='classic'] .hero .btn.primary { color: #2813b8; }
+
+/* ------------------------------ welcome screen ----------------------------- */
+body.welcome-mode .sidebar,
+body.welcome-mode .topbar,
+body.welcome-mode .tabbar { display: none; }
+body.welcome-mode .app { display: block; }
+body.welcome-mode #view { padding: 0; max-width: none; }
+.welcome { max-width: 460px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+.welcome-hero {
+  position: relative; padding: 28px 24px 34px; color: #fff;
+  background: linear-gradient(160deg, #1f9d73 0%, #176f55 100%);
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: center;
+  border-radius: 0 0 28px 28px;
+}
+.welcome-logo { width: 48px; height: 48px; border-radius: 14px; background: #fff; color: #1f9d73; display: grid; place-items: center; }
+.welcome-hero strong { display: block; font-size: 22px; }
+.welcome-hero span { font-size: 13px; opacity: 0.85; }
+.welcome-hero h1 { grid-column: 1 / -1; margin: 26px 0 0; font-size: 30px; line-height: 1.15; }
+.welcome-hero p { grid-column: 1 / -1; margin: 0; opacity: 0.9; font-size: 14px; }
+.welcome-card { padding: 22px 20px 28px; display: flex; flex-direction: column; gap: 14px; }
+.welcome-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.welcome-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.welcome-tab {
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; border-radius: 12px;
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text); font: inherit; font-weight: 700; cursor: pointer;
+}
+.welcome-tab.on { background: #2aa77a; border-color: #2aa77a; color: #fff; }
+.welcome-h { margin: 6px 0 0; font-size: 20px; }
+.welcome .input { width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; }
+.welcome .btn.block { width: 100%; justify-content: center; padding: 14px; font-size: 15px; }
+.welcome .btn.primary { background: #f4b400; border-color: #f4b400; color: #123d2e; }
+.welcome-trust { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.welcome-trust span { display: inline-flex; align-items: center; gap: 5px; }
+@media (min-width: 700px) {
+  .welcome { margin-top: 5vh; min-height: 0; border: 1px solid var(--border); border-radius: 28px; overflow: hidden; }
+}

@@ -1,83 +1,97 @@
-import { h, icon, brandBolt } from '../ui.js';
+import { h, icon, toast } from '../ui.js';
+import { addMeter } from '../state.js';
+import { descoLoginForm } from './descologin.js';
 
+let provider = 'desco';
+
+/** First screen: provider tabs and a sign-in, like the utility's own app. */
 export function renderOnboarding(ctx) {
   const { t } = ctx;
+  const demoMode = Boolean(ctx.serverConfig?.demoMode);
+  const body = h('div', { class: 'welcome-body' });
 
-  const feature = (text) =>
-    h('li', {}, icon('check', { size: 17 }), h('span', {}, text));
-
-  const art = h(
-    'div',
-    { class: 'onboard-art', 'aria-hidden': 'true' },
-    h('span', { class: 'ring r1' }),
-    h('span', { class: 'ring r2' }),
-    h('span', { class: 'ring r3' }),
-    brandBolt(200),
+  const tab = (id, label) =>
     h(
-      'span',
-      { class: 'float-chip a' },
-      h('span', {
-        style: {
-          width: '7px',
-          height: '7px',
-          borderRadius: '50%',
-          background: 'var(--accent)',
-          boxShadow: '0 0 10px var(--accent)',
+      'button',
+      {
+        type: 'button',
+        class: `welcome-tab${provider === id ? ' on' : ''}`,
+        'aria-pressed': String(provider === id),
+        onclick: () => {
+          provider = id;
+          ctx.renderView();
         },
-      }),
-      '৳1,240.50',
-    ),
-    h('span', { class: 'float-chip b' }, icon('clock', { size: 13 }), '12 days left'),
+      },
+      icon('zap', { size: 16 }),
+      label,
+    );
+
+  const accountNo = h('input', {
+    class: 'input',
+    inputmode: 'numeric',
+    placeholder: t('welcome.example'),
+    maxlength: '20',
+    'aria-label': t('welcome.accountLabel'),
+  });
+  const err = h('p', { class: 'small', role: 'alert', style: { color: 'var(--danger)', minHeight: '1.2em' } });
+
+  const nescoForm = h(
+    'form',
+    {
+      class: 'stack',
+      onsubmit: (event) => {
+        event.preventDefault();
+        try {
+          addMeter({ provider: 'nesco', accountNo: accountNo.value, label: '' });
+          ctx.navigate('dashboard');
+          ctx.loadActive();
+        } catch {
+          err.textContent = t('welcome.invalid');
+        }
+      },
+    },
+    h('h2', { class: 'welcome-h' }, t('welcome.nescoTitle')),
+    h('p', { class: 'muted' }, t('welcome.nescoDesc')),
+    accountNo,
+    err,
+    h('button', { class: 'btn primary block', type: 'submit' }, t('onboarding.continue'), icon('arrowRight', { size: 16 })),
   );
 
-  const copy = h(
-    'div',
-    { class: 'onboard-copy' },
-    h('span', { class: 'badge accent', style: { marginBottom: '14px' } }, icon('shield', { size: 12 }), t('onboarding.badge')),
+  if (demoMode || provider === 'nesco') {
+    body.append(nescoForm);
+  } else {
+    body.append(
+      h('h2', { class: 'welcome-h' }, t('welcome.descoTitle')),
+      h('p', { class: 'muted' }, t('welcome.descoDesc')),
+      descoLoginForm(ctx),
+    );
+  }
+
+  return h(
+    'section',
+    { class: 'welcome' },
     h(
-      'h2',
-      {},
-      t('onboarding.title'),
-      ' ',
-      h('em', {}, t('onboarding.titleAccent')),
-    ),
-    h('p', { class: 'lead' }, t('onboarding.lead')),
-    h(
-      'ul',
-      { class: 'onboard-features' },
-      feature(t('onboarding.f1')),
-      feature(t('onboarding.f2')),
-      feature(t('onboarding.f3')),
-      feature(t('onboarding.f4')),
+      'div',
+      { class: 'welcome-hero' },
+      h('span', { class: 'welcome-logo' }, icon('zap', { size: 26 })),
+      h('div', {}, h('strong', {}, 'PrepaidPro'), h('span', {}, t('welcome.tag'))),
+      h('h1', {}, t('welcome.headline')),
+      h('p', {}, t('welcome.sub')),
     ),
     h(
       'div',
-      { class: 'onboard-actions' },
-      ctx.serverConfig?.demoMode
-        ? h(
-            'button',
-            { class: 'btn primary', type: 'button', onclick: () => ctx.openAddMeter() },
-            icon('plus', { size: 17 }),
-            t('onboarding.add'),
-          )
-        : null,
-      ctx.serverConfig?.demoMode
-        ? null
-        : h(
-            'button',
-            { class: 'btn primary', type: 'button', onclick: () => ctx.navigate('desco-login') },
-            icon('shield', { size: 17 }),
-            t('dlogin.signIn'),
-          ),
+      { class: 'welcome-card' },
+      demoMode ? null : h('div', { class: 'welcome-label' }, t('welcome.select')),
+      demoMode ? null : h('div', { class: 'welcome-tabs' }, tab('desco', 'DESCO'), tab('nesco', 'NESCO')),
+      body,
+      h('button', { class: 'btn ghost block', type: 'button', onclick: () => ctx.startDemo() }, icon('sparkles', { size: 16 }), t('onboarding.demo')),
       h(
-        'button',
-        { class: 'btn ghost', type: 'button', onclick: () => ctx.startDemo() },
-        icon('sparkles', { size: 17 }),
-        t('onboarding.demo'),
+        'div',
+        { class: 'welcome-trust' },
+        h('span', {}, icon('shield', { size: 14 }), t('welcome.secure')),
+        h('span', {}, icon('check', { size: 14 }), t('welcome.official')),
+        h('span', {}, icon('zap', { size: 14 }), t('welcome.realtime')),
       ),
     ),
-    h('p', { class: 'onboard-note' }, t('onboarding.note')),
   );
-
-  return h('section', { class: 'onboard' }, art, copy);
 }
