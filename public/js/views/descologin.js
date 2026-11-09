@@ -4,7 +4,7 @@ import { addMeter } from '../state.js';
 
 export function descoLoginForm(ctx) {
   const { t } = ctx;
-  const user = h('input', { class: 'input', id: 'dlUser', autocomplete: 'username', inputmode: 'tel', maxlength: '64', required: true });
+  const user = h('input', { class: 'input', id: 'dlUser', autocomplete: 'username', maxlength: '64', required: true, placeholder: t('dlogin.placeholder'), autocapitalize: 'none' });
   const pass = h('input', { class: 'input', id: 'dlPass', type: 'password', autocomplete: 'current-password', maxlength: '128', required: true });
   const msg = h('p', { class: 'small', id: 'dlMsg', role: 'alert', style: { color: 'var(--danger, #e5484d)', minHeight: '1.2em' } });
   const submit = h('button', { class: 'btn primary', type: 'submit', id: 'dlSubmit' }, icon('shield', { size: 16 }), t('dlogin.submit'));
@@ -47,6 +47,13 @@ export function descoLoginForm(ctx) {
     h('label', { class: 'field' }, h('span', { class: 'label' }, t('dlogin.password')), pass),
     msg,
     submit,
+    h(
+      'div',
+      { class: 'dl-links small' },
+      h('a', { href: 'https://prepaid.desco.org.bd/', target: '_blank', rel: 'noopener noreferrer' }, t('dlogin.forgot')),
+      h('span', { class: 'muted' }, t('dlogin.new')),
+      h('a', { href: 'https://prepaid.desco.org.bd/', target: '_blank', rel: 'noopener noreferrer' }, t('dlogin.create')),
+    ),
     h('p', { class: 'small muted' }, t('dlogin.privacy')),
   );
 

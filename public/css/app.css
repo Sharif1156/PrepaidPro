@@ -2328,3 +2328,6 @@ body.welcome-mode { background:
 .welcome .field .label { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
 .welcome-card form.stack { gap: 14px; }
 .welcome-card .welcome-body > p.muted { margin: 4px 0 14px; font-size: 14px; }
+.dl-links { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
+.dl-links a { color: var(--accent); text-decoration: none; }
+.dl-links a:hover { text-decoration: underline; }
