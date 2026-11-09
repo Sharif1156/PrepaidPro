@@ -9,16 +9,32 @@
  * start, so people have to sign in again after a restart.
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 const ephemeral = randomBytes(32).toString('hex');
 
+/** SESSION_SECRET as an env var, or as a Render Secret File (/etc/secrets or the app root). */
+export function sessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  for (const file of ['/etc/secrets/SESSION_SECRET', join(process.cwd(), 'SESSION_SECRET')]) {
+    try {
+      const value = readFileSync(file, 'utf8').trim();
+      if (value) return value;
+    } catch {
+      /* not there */
+    }
+  }
+  return '';
+}
+
 export function sessionSecretIsSet() {
-  return Boolean(process.env.SESSION_SECRET);
+  return Boolean(sessionSecret());
 }
 
 function key() {
-  const secret = process.env.SESSION_SECRET || ephemeral;
+  const secret = sessionSecret() || ephemeral;
   return createHash('sha256').update(`prepaidpro-session-v1:${secret}`).digest();
 }
 
