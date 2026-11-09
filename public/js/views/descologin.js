@@ -50,9 +50,9 @@ export function descoLoginForm(ctx) {
     h(
       'div',
       { class: 'dl-links small' },
-      h('a', { href: 'https://prepaid.desco.org.bd/', target: '_blank', rel: 'noopener noreferrer' }, t('dlogin.forgot')),
+      h('a', { href: 'https://prepaid.desco.org.bd/login', target: '_blank', rel: 'noopener noreferrer' }, t('dlogin.forgot')),
       h('span', { class: 'muted' }, t('dlogin.new')),
-      h('a', { href: 'https://prepaid.desco.org.bd/', target: '_blank', rel: 'noopener noreferrer' }, t('dlogin.create')),
+      h('a', { href: 'https://prepaid.desco.org.bd/register', target: '_blank', rel: 'noopener noreferrer' }, t('dlogin.create')),
     ),
     h('p', { class: 'small muted' }, t('dlogin.privacy')),
   );
