@@ -123,6 +123,16 @@ test('signing in returns a token (not the password) and the linked meters', asyn
   assert.ok(!JSON.stringify(body).includes('pass-one'));
 });
 
+test('lite mode returns just the balance, quickly, for a first visit', async () => {
+  const token = (await (await login('01711111111', 'pass-one')).json()).token;
+  const response = await fetch(`${BASE}/api/meter/desco/26027256?lite=1`, { headers: { 'X-Desco-Auth': token } });
+  const { account } = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(account.balance, 1111.11);
+  assert.equal(account.meta.lite, true);
+  assert.deepEqual(account.monthly, []);
+});
+
 test('each person reads meters through their own DESCO account', async () => {
   const one = (await (await login('01711111111', 'pass-one')).json()).token;
   const two = (await (await login('01722222222', 'pass-two')).json()).token;

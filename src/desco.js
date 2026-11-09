@@ -355,10 +355,35 @@ async function trySession(path, query) {
 }
 
 /** New portal: signed-in session, meter linked to the server's DESCO login. */
-async function fetchDescoSession(accountNo, { historyDays = config.historyDays, refresh = false } = {}) {
+async function fetchDescoSession(accountNo, { historyDays = config.historyDays, refresh = false, lite = false } = {}) {
   const account = validateAccountNo(accountNo);
   const id = await accountIdFor(account);
   const base = `/api/accounts/${encodeURIComponent(id)}`;
+
+  if (lite) {
+    // Just the balance, so a first visit can show something within a second or two.
+    const balancePayload = await api(`${base}/balance`);
+    const balanceIndex = indexKeys(toObject(balancePayload?.data ?? balancePayload));
+    const balance = pickNumber(balanceIndex, BALANCE_KEYS);
+    if (balance === null) throw accountNotFound('DESCO');
+    return {
+      provider: 'desco',
+      accountNo: account,
+      source: 'portal',
+      demo: false,
+      balance,
+      meterNo: pickString(balanceIndex, METER_KEYS) || null,
+      readingTime: parseBdDate(pickString(balanceIndex, READING_KEYS)) || null,
+      customer: null,
+      currentMonth: { month: yearMonth(new Date()), taka: null, unit: null },
+      monthly: [],
+      recharges: [],
+      daily: [],
+      tokens: [],
+      fetchedAt: new Date().toISOString(),
+      meta: { historyDays, refresh: false, lite: true },
+    };
+  }
 
   const [balancePayload, summaryPayload, monthlyPayload, transactionPayload, dailyPayload, tokenPayload] =
     await Promise.all([

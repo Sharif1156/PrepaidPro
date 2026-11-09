@@ -307,7 +307,8 @@ async function routes(req, res, url) {
       });
     }
     const refresh = ['1', 'true', 'yes'].includes(String(url.searchParams.get('refresh')).toLowerCase());
-    const account = await loadCachedMeter(provider, accountNo, refresh);
+    const lite = provider === 'desco' && !config.demoMode && url.searchParams.get('lite') === '1';
+    const account = lite ? await fetchDesco(accountNo, { lite: true }) : await loadCachedMeter(provider, accountNo, refresh);
 
     if (url.searchParams.get('download') === '1') {
       sendJson(

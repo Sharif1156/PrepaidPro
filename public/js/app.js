@@ -387,6 +387,24 @@ async function loadActive({ refresh = false, silent = false } = {}) {
   renderMiniMeter();
   if (!silent) renderView();
 
+  // First visit, nothing saved yet: ask for just the balance in parallel so the
+  // hero appears in a second or two while the full history is still loading.
+  if (!runtime.account && !refresh && !meter.demo && meter.provider === 'desco') {
+    fetchMeter(meter.provider, meter.accountNo, { lite: true })
+      .then((quick) => {
+        if (currentKey() !== key || runtime.account) return;
+        runtime.account = quick;
+        runtime.fetchedAt = new Date();
+        runtime.fromSnapshot = false;
+        updateStatus();
+        renderMiniMeter();
+        renderView();
+      })
+      .catch(() => {
+        /* the full request below reports any real error */
+      });
+  }
+
   try {
     const account = await fetchMeter(meter.provider, meter.accountNo, { refresh, demo: meter.demo });
     // Ignore late responses for a meter the user already switched away from.

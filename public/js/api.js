@@ -85,8 +85,8 @@ async function requestJson(url, { timeoutMs = 45_000, method = 'GET', headers = 
   return payload;
 }
 
-export async function fetchMeter(provider, accountNo, { refresh = false, demo = false } = {}) {
-  const query = refresh ? '?refresh=1' : '';
+export async function fetchMeter(provider, accountNo, { refresh = false, demo = false, lite = false } = {}) {
+  const query = refresh ? '?refresh=1' : lite ? '?lite=1' : '';
   const base = demo ? '/api/demo' : '/api/meter';
   const url = `${base}/${encodeURIComponent(provider)}/${encodeURIComponent(accountNo)}${query}`;
   // A free server that was asleep needs up to ~50s to wake: wait for it, and if
