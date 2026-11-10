@@ -9,6 +9,7 @@ import {
   formatTimeAgo,
 } from '../format.js';
 import { barChart, chartDims } from '../charts.js';
+import { openRechargeDetail } from './rechargeDetail.js';
 import { forecastBalance, monthToDate, rechargePattern, riskLevel } from '../lib/forecast.js';
 
 const PORTALS = {
@@ -485,8 +486,8 @@ function rechargeCard(ctx, account) {
         { class: 'list' },
         ...rows.map((row) =>
           h(
-            'div',
-            { class: 'list-row' },
+            'button',
+            { class: 'list-row clickable', type: 'button', onclick: () => openRechargeDetail(ctx, row) },
             h('span', { class: 'list-icon' }, icon('zap', { size: 16 })),
             h(
               'div',

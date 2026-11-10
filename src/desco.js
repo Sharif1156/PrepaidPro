@@ -150,6 +150,13 @@ export function monthRange(monthsBack) {
   return { monthFrom: from.toISOString().slice(0, 7), monthTo: now.toISOString().slice(0, 7) };
 }
 
+/** Months from `fromBack` to `toBack` months ago (e.g. 23..12 is last year's twelve months). */
+export function monthRangeBetween(fromBack, toBack) {
+  const now = new Date();
+  const at = (back) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1)).toISOString().slice(0, 7);
+  return { monthFrom: at(fromBack), monthTo: at(toBack) };
+}
+
 export function dateRange(daysBack) {
   const now = new Date();
   const from = new Date(now.getTime() - daysBack * 86_400_000);
@@ -180,6 +187,19 @@ export function normalizeMonthly(rows) {
     .sort((a, b) => a.month.localeCompare(b.month));
 }
 
+/** Every simple field the portal returned for a row, so the detail view can show all of it. */
+function rowDetails(row) {
+  const out = [];
+  for (const [key, value] of Object.entries(row)) {
+    if (value === null || value === undefined || value === '') continue;
+    if (typeof value === 'object') continue;
+    if (/password|secret|token_?secret/i.test(key)) continue;
+    out.push([key, typeof value === 'string' ? value.slice(0, 200) : value]);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
 export function normalizeRecharges(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
@@ -195,6 +215,7 @@ export function normalizeRecharges(rows) {
         vat: pickNumber(index, ['vat', 'vatamount']),
         method: pickString(index, ['salename', 'method', 'rechargemethod', 'paymentmethod']),
         tokenNo: pickString(index, ['tokenno', 'token', 'tokenumber']),
+        details: rowDetails(toObject(row)),
       };
     })
     .filter((row) => row.date || row.amount !== null)
@@ -377,6 +398,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
       customer: null,
       currentMonth: { month: yearMonth(new Date()), taka: null, unit: null },
       monthly: [],
+      monthlyPrev: [],
       recharges: [],
       daily: [],
       tokens: [],
@@ -385,7 +407,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
     };
   }
 
-  const [balancePayload, summaryPayload, monthlyPayload, transactionPayload, dailyPayload, tokenPayload] =
+  const [balancePayload, summaryPayload, monthlyPayload, transactionPayload, dailyPayload, tokenPayload, prevPayload] =
     await Promise.all([
       api(`${base}/balance`),
       trySession(`${base}/summary`),
@@ -393,6 +415,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
       trySession(`${base}/transactions`, dateRange(historyDays)),
       trySession(`${base}/usage/daily`, dateRange(30)),
       trySession(`${base}/tokens`, dateRange(historyDays)),
+      trySession(`${base}/usage/monthly`, monthRangeBetween(23, 12)),
     ]);
 
   const balanceIndex = indexKeys(toObject(balancePayload?.data ?? balancePayload));
@@ -404,6 +427,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
   const recharges = transactionPayload.__error ? [] : normalizeRecharges(rowsOf(transactionPayload));
   const daily = dailyPayload.__error ? [] : normalizeDaily(rowsOf(dailyPayload));
   const tokens = tokenPayload.__error ? [] : normalizeTokens(rowsOf(tokenPayload));
+  const monthlyPrev = prevPayload.__error ? [] : normalizeMonthly(rowsOf(prevPayload));
 
   const balance = pickNumber(balanceIndex, BALANCE_KEYS);
   if (balance === null) throw accountNotFound('DESCO');
@@ -429,6 +453,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
           unit: pickNumber(balanceIndex, MONTH_UNIT_KEYS),
         },
     monthly,
+    monthlyPrev,
     recharges,
     daily,
     tokens,

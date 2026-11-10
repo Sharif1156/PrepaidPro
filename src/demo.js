@@ -74,6 +74,13 @@ export function demoProfile(provider, accountNo) {
     });
   }
 
+  // The same twelve months one year earlier, for the year-on-year comparison.
+  const monthlyPrev = monthly.map((row) => {
+    const [year, month] = row.month.split('-').map(Number);
+    const taka = Math.round(row.taka * (0.78 + random() * 0.3));
+    return { month: `${year - 1}-${pad(month)}`, unit: Math.round(taka / tariff), taka, demand: row.demand };
+  });
+
   const spentThisMonth = monthly[monthly.length - 1].taka;
   const currentDay = now.getUTCDate();
   const projectedMonthly = Math.round((spentThisMonth / Math.max(currentDay, 1)) * 30);
@@ -147,6 +154,7 @@ export function demoProfile(provider, accountNo) {
       unit: monthly[monthly.length - 1].unit,
     },
     monthly,
+    monthlyPrev,
     recharges,
     daily,
     tokens,
