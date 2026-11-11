@@ -342,11 +342,36 @@ async function readMeterNow() {
         ...runtime.account,
         balance: live.balance,
         readingTime: live.readingTime || runtime.account.readingTime,
-        meta: { ...(runtime.account.meta || {}), live: true },
+        meta: { ...(runtime.account.meta || {}), live: true, offline: false },
       };
       runtime.fromSnapshot = false;
       saveSnapshot(meter, runtime.account);
       maybeNotify(meter, runtime.account);
+    } else if (currentKey() === key) {
+      // The normal lookup failed (a meter that has not reported in): the live
+      // reading is all we have, so show it, then try to load the rest again.
+      runtime.account = {
+        provider: meter.provider,
+        accountNo: meter.accountNo,
+        source: 'portal',
+        demo: false,
+        balance: live.balance,
+        meterNo: null,
+        readingTime: live.readingTime || new Date().toISOString(),
+        customer: null,
+        currentMonth: { month: new Date().toISOString().slice(0, 7), taka: null, unit: null },
+        monthly: [],
+        recharges: [],
+        daily: [],
+        tokens: [],
+        fetchedAt: new Date().toISOString(),
+        meta: { live: true, lite: true },
+      };
+      runtime.error = null;
+      runtime.fromSnapshot = false;
+      runtime.fetchedAt = new Date();
+      saveSnapshot(meter, runtime.account);
+      loadActive({ silent: true });
     }
     toast(t('dashboard.liveReadingDone'), formatMoney(live.balance, state.settings.lang));
   } catch (error) {

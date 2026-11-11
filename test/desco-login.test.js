@@ -25,6 +25,8 @@ function resetUsers() {
   users = {
     '01711111111': { password: 'pass-one', accounts: [{ accountId: 11, accountNo: '26027256', meterNo: '661120128359' }] },
     '01722222222': { password: 'pass-two', accounts: [] },
+    // a customer whose meter is offline: the balance call fails
+    '01733333333': { password: 'pass-three', accounts: [{ accountId: 33, accountNo: '41422335', meterNo: '1' }] },
   };
 }
 
@@ -55,6 +57,7 @@ before(async () => {
         return send(res, 201, { accountId, accountNo });
       }
       const match = url.pathname.match(/^\/api\/accounts\/(\d+)\/(.+)$/);
+      if (match && match[2] === 'balance' && owner === '01733333333') return send(res, 500, { message: 'meter offline' });
       if (match && match[2] === 'balance') {
         seen.push(owner);
         return send(res, 200, { meterNo: '661120128359', balance: owner === '01711111111' ? 1111.11 : 2222.22, readingTime: '2026-11-07 15:30:00' });
@@ -131,6 +134,15 @@ test('lite mode returns just the balance, quickly, for a first visit', async () 
   assert.equal(account.balance, 1111.11);
   assert.equal(account.meta.lite, true);
   assert.deepEqual(account.monthly, []);
+});
+
+test('an offline meter still loads, flagged so the app can offer a realtime reading', async () => {
+  const token = (await (await login('01733333333', 'pass-three')).json()).token;
+  const response = await meter('41422335', token);
+  const { account } = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(account.balance, null);
+  assert.equal(account.meta.offline, true);
 });
 
 test('each person reads meters through their own DESCO account', async () => {

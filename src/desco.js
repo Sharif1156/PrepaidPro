@@ -409,7 +409,12 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
 
   const [balancePayload, summaryPayload, monthlyPayload, transactionPayload, dailyPayload, tokenPayload, prevPayload] =
     await Promise.all([
-      api(`${base}/balance`),
+      // A meter that has not reported in makes the balance call fail. Keep going
+      // with the rest, so the "Get realtime balance" button can still be offered.
+      api(`${base}/balance`).catch((error) => {
+        if (error?.code === 'UPSTREAM_HTTP_ERROR') return { __error: error };
+        throw error;
+      }),
       trySession(`${base}/summary`),
       trySession(`${base}/usage/monthly`, monthRange(11)),
       trySession(`${base}/transactions`, dateRange(historyDays)),
@@ -418,7 +423,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
       trySession(`${base}/usage/monthly`, monthRangeBetween(23, 12)),
     ]);
 
-  const balanceIndex = indexKeys(toObject(balancePayload?.data ?? balancePayload));
+  const balanceIndex = balancePayload?.__error ? new Map() : indexKeys(toObject(balancePayload?.data ?? balancePayload));
   const infoIndex = summaryPayload.__error
     ? new Map()
     : indexKeys(toObject(summaryPayload?.data ?? summaryPayload));
@@ -430,7 +435,9 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
   const monthlyPrev = prevPayload.__error ? [] : normalizeMonthly(rowsOf(prevPayload));
 
   const balance = pickNumber(balanceIndex, BALANCE_KEYS);
-  if (balance === null) throw accountNotFound('DESCO');
+  // No balance AND nothing else known: the account really is not there.
+  const hasAnything = !summaryPayload.__error || monthly.length || recharges.length;
+  if (balance === null && !hasAnything) throw accountNotFound('DESCO');
   const meterNo = pickString(balanceIndex, METER_KEYS) || pickString(infoIndex, METER_KEYS);
   const readingTime = parseBdDate(pickString(balanceIndex, READING_KEYS));
   const currentMonth =
@@ -458,7 +465,7 @@ async function fetchDescoSession(accountNo, { historyDays = config.historyDays, 
     daily,
     tokens,
     fetchedAt: new Date().toISOString(),
-    meta: { historyDays, refresh, stale: balancePayload?.stale === true },
+    meta: { historyDays, refresh, stale: balancePayload?.stale === true, offline: balance === null },
   };
 }
 

@@ -64,7 +64,30 @@ function statusBanners(ctx, account) {
 
 function noticeBanners(ctx) {
   const { t } = ctx;
-  return (ctx.notices || []).map((notice) =>
+  const offline =
+    ctx.account?.meta?.offline && !ctx.account?.meta?.live
+      ? [
+          h(
+            'div',
+            { class: 'alert warn', style: { marginBottom: '16px' } },
+            icon('alert', { size: 18 }),
+            h(
+              'div',
+              { style: { flex: '1', minWidth: '0' } },
+              h('strong', {}, t('dashboard.offlineTitle')),
+              h('p', { class: 'small', style: { margin: '2px 0 0' } }, t('dashboard.offlineBody')),
+            ),
+            h(
+              'button',
+              { class: 'btn sm', type: 'button', disabled: ctx.realtimeBusy, onclick: () => ctx.readMeterNow() },
+              icon('gauge', { size: 14 }),
+              ctx.realtimeBusy ? t('dashboard.liveReadingBusy') : t('dashboard.liveReading'),
+            ),
+          ),
+        ]
+      : [];
+  return [...offline, ...(ctx.notices || [])].map((notice) =>
+    notice instanceof Node ? notice :
     h(
       'div',
       { class: `alert ${notice.priority === 'EMERGENCY' ? 'warn' : 'info'}`, style: { marginBottom: '16px' } },
@@ -131,6 +154,14 @@ function fullErrorCard(ctx) {
                 icon('refresh', { size: 16 }),
                 t('errors.retry'),
               ),
+          key !== 'login' && ctx.meter?.provider === 'desco' && !ctx.meter?.demo
+            ? h(
+                'button',
+                { class: 'btn', type: 'button', disabled: ctx.realtimeBusy, onclick: () => ctx.readMeterNow() },
+                icon('gauge', { size: 16 }),
+                ctx.realtimeBusy ? t('dashboard.liveReadingBusy') : t('dashboard.liveReading'),
+              )
+            : null,
           key === 'login'
             ? null
             : h(
