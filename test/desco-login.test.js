@@ -173,6 +173,14 @@ test('a new customer can sign up in three steps, then sign in', async () => {
   assert.equal(users[phone].password, 'N3w-pass!');
 });
 
+test('sign-up also works with an email address', async () => {
+  const email = 'new.person@gmail.com';
+  assert.equal((await reg('start', { username: ' New.Person@Gmail.com ' })).status, 200);
+  assert.equal((await reg('verify', { username: email, code: '123456' })).status, 200);
+  assert.equal((await reg('set-password', { username: email, password: 'N3w-pass!' })).status, 200);
+  assert.equal(users[email].password, 'N3w-pass!');
+});
+
 test('sign-up checks the number and the request header, and limits code requests', async () => {
   assert.equal((await reg('start', { username: 'abc' })).status, 400);
   const noHeader = await fetch(`${BASE}/api/desco/register/start`, { method: 'POST', body: '{"username":"01766666666"}' });

@@ -2,7 +2,8 @@ import { h, icon, card, toast } from '../ui.js';
 import { descoLogin, descoRegister } from '../api.js';
 import { addMeter, rememberedProfile } from '../state.js';
 
-const BD_PHONE = /^01[3-9]\d{8}$/;
+const BD_PHONE = /^(\+?88)?01[3-9]\d{8}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function addAccounts(accounts) {
   let added = 0;
@@ -103,7 +104,7 @@ export function descoLoginForm(ctx) {
   }
 
   function signupPhone() {
-    const phone = h('input', { class: 'input', id: 'suPhone', inputmode: 'numeric', autocomplete: 'tel', maxlength: '11', required: true, placeholder: '01712345678', value: phoneForSignup });
+    const phone = h('input', { class: 'input', id: 'suPhone', inputmode: 'numeric', autocomplete: 'tel', maxlength: '254', required: true, placeholder: t('dlogin.placeholder'), autocapitalize: 'none', value: phoneForSignup });
     const msg = msgEl();
     const submit = h('button', { class: 'btn primary', type: 'submit' }, icon('arrowRight', { size: 16 }), t('dlogin.sendCode'));
     show(
@@ -113,7 +114,7 @@ export function descoLoginForm(ctx) {
           class: 'stack',
           onsubmit: handle(submit, msg, t('dlogin.busy'), async () => {
             const value = phone.value.trim();
-            if (!BD_PHONE.test(value)) throw new Error(t('dlogin.badPhone'));
+            if (!BD_PHONE.test(value) && !EMAIL.test(value)) throw new Error(t('dlogin.badPhone'));
             await descoRegister('start', { username: value });
             phoneForSignup = value;
             signupCode();
@@ -121,7 +122,7 @@ export function descoLoginForm(ctx) {
         },
         h('h3', { class: 'dl-sub' }, t('dlogin.create')),
         h('p', { class: 'muted' }, t('dlogin.signupIntro')),
-        field(t('dlogin.mobile'), phone),
+        field(t('dlogin.username'), phone),
         msg,
         submit,
         h('button', { class: 'btn ghost', type: 'button', onclick: () => loginStep(phoneForSignup) }, t('dlogin.back')),

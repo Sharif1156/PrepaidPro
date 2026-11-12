@@ -275,8 +275,10 @@ async function routes(req, res, url) {
     if (config.demoMode) throw badRequest('Sign-up is not available in demo mode.');
     const step = signup[1];
     const body = await readJsonBody(req);
-    const username = String(body.username || '').replace(/[^\d+]/g, '').slice(0, 20);
-    if (!/^\+?\d{10,14}$/.test(username)) throw badRequest('Enter your mobile number, like 01712345678.');
+    const rawContact = String(body.username || '').trim().slice(0, 254);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(rawContact);
+    const username = isEmail ? rawContact.toLowerCase() : rawContact.replace(/[^\d+]/g, '').slice(0, 20);
+    if (!isEmail && !/^\+?\d{10,14}$/.test(username)) throw badRequest('Enter your mobile number or email address.');
     const caps = { start: 3, verify: 8, 'set-password': 5 };
     for (const [key, max] of [[`reg:${step}:ip:${clientIp(req)}`, 20], [`reg:${step}:${username}`, caps[step]]]) {
       const attempt = slowAllowed(key, max);
