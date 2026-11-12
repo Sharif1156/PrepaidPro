@@ -1,5 +1,5 @@
 /* PrepaidPro service worker: offline app shell + last-known balance. */
-const VERSION = 'prepaidpro-v1.0.25';
+const VERSION = 'prepaidpro-v1.0.26';
 const SHELL = [
   '/',
   '/index.html',

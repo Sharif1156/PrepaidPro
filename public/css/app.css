@@ -2408,11 +2408,15 @@ body.welcome-mode { background: linear-gradient(160deg, #0a7a45 0%, #0f9d58 55%,
   .welcome-card form .small.muted, .welcome-trust { display: none; }
 }
 /* tall phones have room for the extra text again */
+@media (max-width: 520px) and (min-height: 720px) {
+  .welcome-hero > p { display: block; font-size: 14px; line-height: 1.4; }
+  .welcome-trust { display: flex; font-size: 11px; gap: 10px; margin-top: 0; }
+}
 @media (max-width: 520px) and (min-height: 940px) {
-  .welcome-hero > p { display: block; font-size: 15px; }
   .welcome-card .welcome-body > p.muted { display: block; margin: 0; font-size: 14px; }
-  .welcome-trust { display: flex; }
 }
 @media (max-width: 520px) and (min-height: 1040px) {
   .welcome-card form .small.muted { display: block; }
 }
+
+.dl-msg:empty { display: none; }
