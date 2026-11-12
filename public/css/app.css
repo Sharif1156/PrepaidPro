@@ -2389,20 +2389,30 @@ body.welcome-mode { background: linear-gradient(160deg, #0a7a45 0%, #0f9d58 55%,
 .linklike { background: none; border: 0; padding: 4px 0; color: #0a7a45; font: inherit; cursor: pointer; text-decoration: underline; }
 .linklike.strong { font-weight: 700; }
 
-/* ---- welcome on phones: fit one screen, no scrolling on the sign-in step ---- */
+/* ---- welcome on phones: fills any screen height, sizes scale with it ---- */
 @media (max-width: 520px) {
   body.welcome-mode { zoom: 1; }
-  .welcome { padding: 18px 16px 20px; gap: 14px; min-height: 100dvh; align-content: start; }
-  .welcome-hero { gap: 8px; }
-  .welcome-logo { width: 34px; height: 34px; border-radius: 10px; }
-  .welcome-hero h1 { margin: 6px 0 0; font-size: 28px; line-height: 1.1; }
+  .welcome { display: flex; flex-direction: column; justify-content: center; gap: clamp(14px, 3.4dvh, 36px);
+    min-height: 100dvh; padding: clamp(16px, 3dvh, 34px) 16px clamp(16px, 3dvh, 34px); }
+  .welcome-hero { gap: clamp(6px, 1.4dvh, 14px); }
+  .welcome-logo { width: clamp(34px, 5dvh, 46px); height: clamp(34px, 5dvh, 46px); border-radius: 12px; }
+  .welcome-hero h1 { margin: clamp(2px, 1dvh, 12px) 0 0; font-size: clamp(27px, 4.6dvh, 44px); line-height: 1.1; }
   .welcome-hero > p { display: none; }
-  .welcome-card { padding: 16px; gap: 10px; border-radius: 22px; }
-  .welcome-tab { padding: 9px; }
-  .welcome-h { font-size: 18px; margin: 2px 0 0; }
+  .welcome-card { padding: clamp(16px, 2.6dvh, 28px); gap: clamp(10px, 1.8dvh, 18px); border-radius: 24px; }
+  .welcome-tab { padding: clamp(9px, 1.6dvh, 14px); }
+  .welcome-h { font-size: clamp(18px, 2.8dvh, 24px); margin: 2px 0 0; }
   .welcome-card .welcome-body > p.muted { display: none; }
-  .welcome .input { padding: 12px 14px; }
-  .welcome-card form.stack { gap: 10px; }
-  .welcome-card form .small.muted { display: none; }
-  .welcome-trust { display: none; }
+  .welcome .input { padding: clamp(12px, 1.9dvh, 17px) 14px; }
+  .welcome .btn.primary { padding: clamp(13px, 2dvh, 18px); }
+  .welcome-card form.stack { gap: clamp(10px, 1.8dvh, 18px); }
+  .welcome-card form .small.muted, .welcome-trust { display: none; }
+}
+/* tall phones have room for the extra text again */
+@media (max-width: 520px) and (min-height: 940px) {
+  .welcome-hero > p { display: block; font-size: 15px; }
+  .welcome-card .welcome-body > p.muted { display: block; margin: 0; font-size: 14px; }
+  .welcome-trust { display: flex; }
+}
+@media (max-width: 520px) and (min-height: 1040px) {
+  .welcome-card form .small.muted { display: block; }
 }
