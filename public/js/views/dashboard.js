@@ -69,7 +69,7 @@ function noticeBanners(ctx) {
       ? [
           h(
             'div',
-            { class: 'alert warn', style: { marginBottom: '16px' } },
+            { class: 'alert warn has-action', style: { marginBottom: '16px' } },
             icon('alert', { size: 18 }),
             h(
               'div',

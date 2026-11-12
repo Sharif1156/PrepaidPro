@@ -278,6 +278,41 @@ export async function verifyLogin(creds) {
   }
 }
 
+/* -------------------------- creating a DESCO account -------------------------- */
+
+const signups = new Map(); // username -> { client, at }
+const SIGNUP_STEPS = {
+  start: (username) => ({ path: '/api/auth/register/start', body: { username } }),
+  verify: (username, extra) => ({ path: '/api/auth/register/verify', body: { username, code: String(extra.code || '') } }),
+  'set-password': (username, extra) => ({ path: '/api/auth/register/set-password', body: { username, password: String(extra.password || '') } }),
+};
+
+/** One step of DESCO's three-step sign-up (contact, verification code, password). */
+export async function registerStep(step, username, extra = {}) {
+  const build = SIGNUP_STEPS[step];
+  if (!build) throw new AppError('BAD_REQUEST', 'Unknown sign-up step.', { status: 400, retryable: false });
+  const now = Date.now();
+  for (const [key, entry] of signups) if (now - entry.at > 20 * 60_000) signups.delete(key);
+  let entry = signups.get(username);
+  if (step === 'start' || !entry) {
+    entry = { client: new DescoClient(null), at: now };
+    await entry.client.raw('GET', '/api/auth/csrf');
+    signups.set(username, entry);
+  }
+  entry.at = now;
+  const { path, body } = build(username, extra);
+  const result = await entry.client.raw('POST', path, { body });
+  if (!result.ok) {
+    throw new AppError('DESCO_REGISTER_FAILED', result.json?.message || 'DESCO did not accept this. Check the details and try again.', {
+      status: 400,
+      retryable: false,
+      details: { upstreamStatus: result.status },
+    });
+  }
+  if (step === 'set-password') signups.delete(username);
+  return { message: result.json?.message || 'OK' };
+}
+
 /** Forget every session (used by tests). */
 export function resetSession() {
   shared = null;

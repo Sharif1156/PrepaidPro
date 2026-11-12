@@ -19,6 +19,8 @@ const defaultSettings = {
   alarms: {},
   // Names and limits of DESCO meters, kept by account number across sign-out.
   descoProfiles: {},
+  // Your own logo (a small image kept on this device only), shown in the menu and avatar.
+  logo: '',
 };
 
 const listeners = new Set();
@@ -55,6 +57,7 @@ function load() {
     const settings = { ...defaultSettings, ...(raw?.settings || {}) };
     if (!settings.descoProfiles || typeof settings.descoProfiles !== 'object' || Array.isArray(settings.descoProfiles)) settings.descoProfiles = {};
     if (!settings.alarms || typeof settings.alarms !== 'object' || Array.isArray(settings.alarms)) settings.alarms = {};
+    if (typeof settings.logo !== 'string' || !settings.logo.startsWith('data:image/') || settings.logo.length > 80_000) settings.logo = '';
     if (!['en', 'bn'].includes(settings.lang)) settings.lang = 'en';
     if (!['dark', 'light', 'classic'].includes(settings.theme)) settings.theme = 'dark';
     return {

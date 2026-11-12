@@ -1,4 +1,5 @@
 import { ensureChain, descoTlsStatus } from './src/tls-chain.js';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -11,7 +12,7 @@ import { fetchDesco, fetchDescoNotices, requestRealtimeBalance } from './src/des
 import { fetchNesco } from './src/nesco.js';
 import { fetchDemo } from './src/demo.js';
 import { seal, unseal } from './src/auth.js';
-import { descoBase, runWithClient, userClient, verifyLogin, dropUserClient, hasPersonalClient, credentials } from './src/desco-session.js';
+import { registerStep, descoBase, runWithClient, userClient, verifyLogin, dropUserClient, hasPersonalClient, credentials } from './src/desco-session.js';
 
 const PUBLIC_DIR = resolve(process.cwd(), 'public');
 const cache = createCache({ ttlMs: config.cacheTtlMs });
@@ -82,6 +83,22 @@ function loginAllowed(ip) {
   loginBuckets.set(ip, bucket);
   if (loginBuckets.size > 5_000) loginBuckets.clear();
   return { allowed: bucket.count <= 10, retryAfter: Math.ceil((bucket.resetAt - now) / 1000) };
+}
+
+const slowBuckets = new Map();
+
+/** Fixed-window counter for sensitive actions (sign-up codes cost real SMS messages). */
+function slowAllowed(key, max, windowMs = 15 * 60_000) {
+  const now = Date.now();
+  const bucket = slowBuckets.get(key) || { count: 0, resetAt: now + windowMs };
+  if (bucket.resetAt <= now) {
+    bucket.count = 0;
+    bucket.resetAt = now + windowMs;
+  }
+  bucket.count += 1;
+  slowBuckets.set(key, bucket);
+  if (slowBuckets.size > 10_000) slowBuckets.clear();
+  return { allowed: bucket.count <= max, retryAfter: Math.ceil((bucket.resetAt - now) / 1000) };
 }
 
 function readJsonBody(req, maxBytes = 4096) {
@@ -162,7 +179,10 @@ async function handleApi(req, res, url) {
   // Cheap, cache-backed endpoints do not count: only meter lookups reach the utility.
   const cheap = ['/api/health', '/api/config', '/api/notices', '/api/desco/logout'].includes(url.pathname);
   if (!cheap) {
-    const limit = rateLimit(clientIp(req));
+    // Many phones share one address on mobile networks, so a signed-in person is counted on their own.
+    const who = req.headers['x-desco-auth'] ? unseal(req.headers['x-desco-auth']) : null;
+    const key = who ? `u:${createHash('sha256').update(who.username).digest('hex').slice(0, 24)}` : clientIp(req);
+    const limit = rateLimit(key);
     if (!limit.allowed) throw rateLimited(limit.retryAfter);
   }
 
@@ -246,6 +266,27 @@ async function routes(req, res, url) {
       throw error;
     }
     sendJson(res, 200, { ok: true, token: seal({ username, password }), accounts });
+    return true;
+  }
+
+  const signup = /^\/api\/desco\/register\/(start|verify|set-password)$/.exec(url.pathname);
+  if (req.method === 'POST' && signup) {
+    if (req.headers['x-requested-with'] !== 'PrepaidPro') throw badRequest('Missing request header.');
+    if (config.demoMode) throw badRequest('Sign-up is not available in demo mode.');
+    const step = signup[1];
+    const body = await readJsonBody(req);
+    const username = String(body.username || '').replace(/[^\d+]/g, '').slice(0, 20);
+    if (!/^\+?\d{10,14}$/.test(username)) throw badRequest('Enter your mobile number, like 01712345678.');
+    const caps = { start: 3, verify: 8, 'set-password': 5 };
+    for (const [key, max] of [[`reg:${step}:ip:${clientIp(req)}`, 20], [`reg:${step}:${username}`, caps[step]]]) {
+      const attempt = slowAllowed(key, max);
+      if (!attempt.allowed) throw rateLimited(attempt.retryAfter);
+    }
+    const result = await registerStep(step, username, {
+      code: String(body.code || '').slice(0, 12),
+      password: String(body.password || '').slice(0, 128),
+    });
+    sendJson(res, 200, { ok: true, message: result.message });
     return true;
   }
 
@@ -416,7 +457,7 @@ const server = createServer(async (req, res) => {
   });
 
   const isRealtime = req.method === 'POST' && /^\/api\/meter\/desco\/\d+\/realtime$/.test(url.pathname);
-  const isDescoAuth = req.method === 'POST' && /^\/api\/desco\/(login|logout)$/.test(url.pathname);
+  const isDescoAuth = req.method === 'POST' && /^\/api\/desco\/(login|logout|register\/(start|verify|set-password))$/.test(url.pathname);
   if (!['GET', 'HEAD'].includes(req.method) && !isRealtime && !isDescoAuth) {
     sendJson(res, 405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } });
     return;

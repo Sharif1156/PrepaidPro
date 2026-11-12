@@ -236,7 +236,26 @@ function renderMiniMeter() {
   );
 }
 
+/** Show the person's own logo (if they added one) in the menu and the avatar button. */
+function applyLogo() {
+  const logo = state.settings.logo;
+  const mark = document.querySelector('.brand-mark');
+  const avatar = document.getElementById('avatarBtn');
+  if (mark) {
+    mark.querySelector('img.custom-logo')?.remove();
+    const svg = mark.querySelector('svg');
+    if (svg) svg.style.display = logo ? 'none' : '';
+    if (logo) mark.append(h('img', { class: 'custom-logo', src: logo, alt: '', width: 34, height: 34 }));
+  }
+  if (avatar) {
+    avatar.textContent = logo ? '' : 'PP';
+    avatar.classList.toggle('has-logo', Boolean(logo));
+    avatar.style.backgroundImage = logo ? `url("${logo}")` : '';
+  }
+}
+
 function renderChrome() {
+  applyLogo();
   const meta = routeMeta(currentRoute);
   document.getElementById('pageTitle').textContent = meta.title;
   document.getElementById('pageSubtitle').textContent = meta.subtitle || '';
@@ -382,6 +401,24 @@ async function readMeterNow() {
   }
 }
 
+/**
+ * Like fetchMeter, but a meter that is offline (no balance in the answer) keeps
+ * the last balance we knew, e.g. one from "Get realtime balance", instead of "--".
+ */
+async function fetchKeeping(meter, options = {}) {
+  const account = await fetchMeter(meter.provider, meter.accountNo, options);
+  if (account?.balance !== null && account?.balance !== undefined) return account;
+  const current = runtime.account && `${runtime.account.provider}:${runtime.account.accountNo}` === `${meter.provider}:${meter.accountNo}` ? runtime.account : null;
+  const last = [current, getSnapshot(meter)].find((item) => item && item.balance !== null && item.balance !== undefined);
+  if (!last) return account;
+  return {
+    ...account,
+    balance: last.balance,
+    readingTime: last.readingTime || account.readingTime,
+    meta: { ...(account.meta || {}), offline: false, carried: true },
+  };
+}
+
 async function loadActive({ refresh = false, silent = false } = {}) {
   const meter = activeMeter();
   if (!meter) return;
@@ -431,7 +468,7 @@ async function loadActive({ refresh = false, silent = false } = {}) {
   }
 
   try {
-    const account = await fetchMeter(meter.provider, meter.accountNo, { refresh, demo: meter.demo });
+    const account = await fetchKeeping(meter, { refresh, demo: meter.demo });
     // Ignore late responses for a meter the user already switched away from.
     if (currentKey() !== key) return;
     runtime.account = account;
@@ -484,7 +521,7 @@ function prefetchOtherMeters() {
     while (queue.length) {
       const meter = queue.shift();
       try {
-        const account = await fetchMeter(meter.provider, meter.accountNo, { demo: meter.demo });
+        const account = await fetchKeeping(meter, { demo: meter.demo });
         saveSnapshot(meter, account);
         runtime.meterSummaries[meter.id] = { account, error: null, at: Date.now() };
         maybeNotify(meter, account);
@@ -504,7 +541,7 @@ async function loadAllSummaries() {
   await Promise.all(
     meters.map(async (meter) => {
       try {
-        const account = await fetchMeter(meter.provider, meter.accountNo, { demo: meter.demo });
+        const account = await fetchKeeping(meter, { demo: meter.demo });
         runtime.meterSummaries[meter.id] = { account, error: null, at: Date.now() };
         saveSnapshot(meter, account);
         maybeNotify(meter, account);
@@ -666,7 +703,7 @@ async function alarmTick() {
       let account = null;
       try {
         // A due reminder must see the newest balance, otherwise a recharge is missed.
-        account = await fetchMeter(meter.provider, meter.accountNo, { refresh: due.includes(meter) });
+        account = await fetchKeeping(meter, { refresh: due.includes(meter) });
         saveSnapshot(meter, account);
         runtime.meterSummaries[meter.id] = { account, error: null, at: Date.now() };
         if (meter.id === state.activeMeterId) {

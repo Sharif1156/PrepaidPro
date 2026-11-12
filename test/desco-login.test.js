@@ -45,6 +45,16 @@ before(async () => {
         if (users[body.username]?.password !== body.password) return send(res, 401, { authenticated: false });
         return send(res, 200, { authenticated: true }, { 'Set-Cookie': `SESSION=${body.username}; Path=/; HttpOnly` });
       }
+      const reg = url.pathname.match(/^\/api\/auth\/register\/(start|verify|set-password)$/);
+      if (reg) {
+        const body = JSON.parse(raw || '{}');
+        if (reg[1] === 'start') return send(res, 202, { status: 'OK', message: 'code sent' });
+        if (reg[1] === 'verify') {
+          return body.code === '123456' ? send(res, 200, { status: 'OK', message: 'verified' }) : send(res, 400, { message: 'Wrong or expired code.' });
+        }
+        users[body.username] = { password: body.password, accounts: [] };
+        return send(res, 200, { status: 'OK', message: 'Registration complete.' });
+      }
       if (!owner || !users[owner]) return send(res, 401, {});
       const me = users[owner];
       if (url.pathname === '/api/accounts' && req.method === 'GET') {
@@ -143,6 +153,33 @@ test('an offline meter still loads, flagged so the app can offer a realtime read
   assert.equal(response.status, 200);
   assert.equal(account.balance, null);
   assert.equal(account.meta.offline, true);
+});
+
+const reg = (step, body) =>
+  fetch(`${BASE}/api/desco/register/${step}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'PrepaidPro' },
+    body: JSON.stringify(body),
+  });
+
+test('a new customer can sign up in three steps, then sign in', async () => {
+  const phone = '01755555555';
+  assert.equal((await reg('start', { username: phone })).status, 200);
+  const wrong = await reg('verify', { username: phone, code: '000000' });
+  assert.equal(wrong.status, 400);
+  assert.equal((await wrong.json()).error.message, 'Wrong or expired code.');
+  assert.equal((await reg('verify', { username: phone, code: '123456' })).status, 200);
+  assert.equal((await reg('set-password', { username: phone, password: 'N3w-pass!' })).status, 200);
+  assert.equal(users[phone].password, 'N3w-pass!');
+});
+
+test('sign-up checks the number and the request header, and limits code requests', async () => {
+  assert.equal((await reg('start', { username: 'abc' })).status, 400);
+  const noHeader = await fetch(`${BASE}/api/desco/register/start`, { method: 'POST', body: '{"username":"01766666666"}' });
+  assert.equal(noHeader.status, 400);
+  const results = [];
+  for (let i = 0; i < 5; i += 1) results.push((await reg('start', { username: '01777777777' })).status);
+  assert.deepEqual(results, [200, 200, 200, 429, 429]);
 });
 
 test('each person reads meters through their own DESCO account', async () => {

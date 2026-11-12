@@ -63,6 +63,59 @@ export function renderSettings(ctx) {
     ),
   });
 
+  const logoInput = h('input', { type: 'file', accept: 'image/*', hidden: true, id: 'logoInput' });
+  logoInput.addEventListener('change', async () => {
+    const file = logoInput.files?.[0];
+    logoInput.value = '';
+    if (!file) return;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const g = canvas.getContext('2d');
+      const side = Math.min(bitmap.width, bitmap.height); // centre-crop to a square
+      g.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+      const logo = canvas.toDataURL('image/png');
+      if (logo.length > 80_000) throw new Error('too large');
+      updateSettings({ logo });
+      toast(t('settings.logoSaved'));
+      ctx.renderChrome();
+      ctx.renderView();
+    } catch {
+      toast(t('settings.logoFailed'), '', { type: 'error' });
+    }
+  });
+  const logoCard = card({
+    title: t('settings.logoTitle'),
+    subtitle: t('settings.logoDesc'),
+    body: h(
+      'div',
+      { class: 'row', style: { alignItems: 'center', gap: '14px' } },
+      settings.logo
+        ? h('img', { src: settings.logo, alt: '', width: 56, height: 56, style: { borderRadius: '14px' } })
+        : h('span', { class: 'empty-art', style: { width: '56px', height: '56px' } }, icon('image', { size: 24 })),
+      logoInput,
+      h('button', { class: 'btn', type: 'button', onclick: () => logoInput.click() }, icon('image', { size: 16 }), t('settings.logoChoose')),
+      settings.logo
+        ? h(
+            'button',
+            {
+              class: 'btn ghost',
+              type: 'button',
+              onclick: () => {
+                updateSettings({ logo: '' });
+                ctx.renderChrome();
+                ctx.renderView();
+              },
+            },
+            t('settings.logoRemove'),
+          )
+        : null,
+    ),
+  });
+
   const languageCard = card({
     title: t('settings.appearance'),
     subtitle: t('settings.themeDesc'),
@@ -479,6 +532,7 @@ export function renderSettings(ctx) {
         )
       : null,
     demoMode ? null : descoCard,
+    logoCard,
     h('div', { class: 'grid cols-2', style: { alignItems: 'start' } }, languageCard, alertsCard),
     dataCard,
     aboutCard,

@@ -96,7 +96,6 @@ export function renderOnboarding(ctx) {
       demoMode ? null : h('div', { class: 'welcome-label' }, t('welcome.select')),
       demoMode ? null : h('div', { class: 'welcome-tabs' }, tab('desco', 'DESCO'), tab('nesco', 'NESCO')),
       body,
-      h('button', { class: 'btn ghost block', type: 'button', onclick: () => ctx.startDemo() }, icon('sparkles', { size: 16 }), t('onboarding.demo')),
       h(
         'div',
         { class: 'welcome-trust' },

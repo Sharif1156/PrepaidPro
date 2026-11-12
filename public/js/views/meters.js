@@ -261,7 +261,19 @@ function meterCard(ctx, meter) {
           {
             class: 'btn sm ghost',
             type: 'button',
+            'aria-label': t('meters.edit'),
+            title: t('meters.edit'),
+            onclick: () => openEditMeterModal(ctx, meter),
+          },
+          icon('pencil', { size: 14 }),
+        ),
+        h(
+          'button',
+          {
+            class: 'btn sm ghost',
+            type: 'button',
             'aria-label': t('meters.remove'),
+            title: t('meters.remove'),
             onclick: () => ctx.confirmRemoveMeter(meter),
           },
           icon('trash', { size: 14 }),
@@ -280,6 +292,39 @@ function meterCard(ctx, meter) {
       ),
     ),
   );
+}
+
+/** Change a meter's nickname and low-balance limit. The account number itself never changes. */
+function openEditMeterModal(ctx, meter) {
+  const { t } = ctx;
+  const nameInput = h('input', { class: 'input', maxlength: '48', value: meter.label || '', placeholder: t('meters.labelHint'), autocomplete: 'off' });
+  const limitInput = h('input', { class: 'input', type: 'number', min: '0', step: '50', value: String(meter.threshold ?? ctx.state.settings.threshold) });
+  const save = () => {
+    const value = Number(limitInput.value);
+    updateMeter(meter.id, {
+      label: nameInput.value.trim().slice(0, 48),
+      threshold: limitInput.value !== '' && Number.isFinite(value) && value >= 0 ? value : null,
+    });
+    closeModal();
+    ctx.renderView();
+    ctx.renderChrome();
+    toast(t('meters.saved'));
+  };
+  openModal({
+    title: t('meters.edit'),
+    subtitle: `${meter.provider.toUpperCase()} ${meter.accountNo}`,
+    body: h(
+      'form',
+      { class: 'stack', onsubmit: (event) => { event.preventDefault(); save(); } },
+      h('label', { class: 'field' }, h('span', { class: 'label' }, t('meters.label')), nameInput),
+      h('label', { class: 'field' }, h('span', { class: 'label' }, t('meters.thresholdLabel')), limitInput),
+    ),
+    footer: [
+      h('button', { class: 'btn ghost', type: 'button', onclick: closeModal }, t('common.cancel')),
+      h('button', { class: 'btn primary', type: 'button', onclick: save }, t('common.save')),
+    ],
+  });
+  setTimeout(() => nameInput.focus(), 50);
 }
 
 function openThresholdModal(ctx, meter) {

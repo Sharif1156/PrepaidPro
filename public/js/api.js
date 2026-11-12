@@ -138,6 +138,16 @@ export async function descoLogin(username, password) {
   return res.accounts || [];
 }
 
+/** One step of creating a DESCO account inside the app: start (send code), verify, set-password. */
+export async function descoRegister(step, body) {
+  return requestJson(`/api/desco/register/${step}`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'PrepaidPro' },
+    body,
+    timeoutMs: 45_000,
+  });
+}
+
 export async function descoLogout() {
   try {
     await requestJson('/api/desco/logout', { method: 'POST', body: {} });
