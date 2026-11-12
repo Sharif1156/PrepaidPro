@@ -23,6 +23,7 @@ import { renderInsights } from './views/insights.js';
 import { renderSettings } from './views/settings.js';
 import { renderDescoLogin } from './views/descologin.js';
 import { renderOnboarding } from './views/onboarding.js';
+import { applyWelcomeColor } from './lib/welcomecolor.js';
 
 const ROUTES = ['dashboard', 'meters', 'usage', 'insights', 'settings', 'desco-login'];
 
@@ -256,6 +257,7 @@ function applyLogo() {
 
 function renderChrome() {
   applyLogo();
+  applyWelcomeColor(state.settings.welcomeColor);
   const meta = routeMeta(currentRoute);
   document.getElementById('pageTitle').textContent = meta.title;
   document.getElementById('pageSubtitle').textContent = meta.subtitle || '';

@@ -21,6 +21,8 @@ const defaultSettings = {
   descoProfiles: {},
   // Your own logo (a small image kept on this device only), shown in the menu and avatar.
   logo: '',
+  // Base colour of the sign-in screen ('' = the default green).
+  welcomeColor: '',
 };
 
 const listeners = new Set();
@@ -57,6 +59,7 @@ function load() {
     const settings = { ...defaultSettings, ...(raw?.settings || {}) };
     if (!settings.descoProfiles || typeof settings.descoProfiles !== 'object' || Array.isArray(settings.descoProfiles)) settings.descoProfiles = {};
     if (!settings.alarms || typeof settings.alarms !== 'object' || Array.isArray(settings.alarms)) settings.alarms = {};
+    if (!/^#[0-9a-f]{6}$/i.test(settings.welcomeColor || '')) settings.welcomeColor = '';
     if (typeof settings.logo !== 'string' || !settings.logo.startsWith('data:image/') || settings.logo.length > 80_000) settings.logo = '';
     if (!['en', 'bn'].includes(settings.lang)) settings.lang = 'en';
     if (!['dark', 'light', 'classic'].includes(settings.theme)) settings.theme = 'dark';

@@ -3,6 +3,7 @@ import { h, icon, card, openModal, closeModal, toast, download } from '../ui.js'
 import { updateSettings, clearAll, exportAll, importAll } from '../state.js';
 import { formatMoney, formatDate } from '../format.js';
 import { languages } from '../i18n.js';
+import { applyWelcomeColor, colorSwatches } from '../lib/welcomecolor.js';
 import { getDescoAuth, descoLogout } from '../api.js';
 
 function settingRow({ label, desc, control }) {
@@ -111,6 +112,40 @@ export function renderSettings(ctx) {
               },
             },
             t('settings.logoRemove'),
+          )
+        : null,
+    ),
+  });
+
+  const colorCard = card({
+    title: t('settings.colorTitle'),
+    subtitle: t('settings.colorDesc'),
+    body: h(
+      'div',
+      { class: 'stack' },
+      colorSwatches(
+        h,
+        settings.welcomeColor || '',
+        (hex) => {
+          updateSettings({ welcomeColor: hex });
+          applyWelcomeColor(hex);
+          ctx.renderView();
+        },
+        t('settings.colorTitle'),
+      ),
+      settings.welcomeColor
+        ? h(
+            'button',
+            {
+              class: 'btn ghost',
+              type: 'button',
+              onclick: () => {
+                updateSettings({ welcomeColor: '' });
+                applyWelcomeColor('');
+                ctx.renderView();
+              },
+            },
+            t('settings.colorReset'),
           )
         : null,
     ),
@@ -533,6 +568,7 @@ export function renderSettings(ctx) {
       : null,
     demoMode ? null : descoCard,
     logoCard,
+    colorCard,
     h('div', { class: 'grid cols-2', style: { alignItems: 'start' } }, languageCard, alertsCard),
     dataCard,
     aboutCard,

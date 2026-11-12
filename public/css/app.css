@@ -2360,9 +2360,9 @@ button.list-row.clickable:focus-visible { outline: 2px solid var(--accent); outl
 .avatar.has-logo { background-size: cover; background-position: center; color: transparent; }
 
 /* ---- welcome v3: green hero, light card, yellow action (overrides above) ---- */
-body.welcome-mode { background: linear-gradient(160deg, #0a7a45 0%, #0f9d58 55%, #17b26a 100%); }
+body.welcome-mode { background: linear-gradient(160deg, var(--wl-a, #0a7a45) 0%, var(--wl-b, #0f9d58) 55%, var(--wl-c, #17b26a) 100%); }
 .welcome { max-width: 980px; }
-.welcome-logo { background: #fff; color: #0a7a45; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.welcome-logo { background: #fff; color: var(--wl-a, #0a7a45); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 .welcome-brand, .welcome-hero h1 { color: #fff; }
 .welcome-brand small, .welcome-hero p { color: rgba(255,255,255,.82); }
 .welcome-hero h1 em { background: none; color: #ffe066; -webkit-text-fill-color: #ffe066; }
@@ -2376,17 +2376,17 @@ body.welcome-mode { background: linear-gradient(160deg, #0a7a45 0%, #0f9d58 55%,
 .welcome-card .welcome-h, .welcome-card .dl-sub { color: #15231b; }
 .welcome-tabs { background: #eef3ef; border-color: #dfe8e2; }
 .welcome-tab { color: #3b4d43; }
-.welcome-tab.on { background: #0f9d58; color: #fff; box-shadow: 0 6px 16px rgba(15,157,88,.3); }
+.welcome-tab.on { background: var(--wl-b, #0f9d58); color: #fff; box-shadow: 0 6px 16px rgba(15,157,88,.3); }
 .welcome .input { background: #f6f9f7; border: 1.5px solid #d5e0d9; color: #15231b; }
-.welcome .input:focus { border-color: #0f9d58; box-shadow: 0 0 0 3px rgba(15,157,88,.18); }
+.welcome .input:focus { border-color: var(--wl-b, #0f9d58); box-shadow: 0 0 0 3px rgba(15,157,88,.18); }
 .welcome .field .label { color: #4a5b52; }
 .welcome .btn.primary { background: #ffcc1a; color: #2a2100; box-shadow: 0 10px 24px rgba(255,204,26,.4); }
-.welcome .btn.ghost { color: #0a7a45; background: transparent; border: 1.5px solid #cfe0d5; }
+.welcome .btn.ghost { color: var(--wl-a, #0a7a45); background: transparent; border: 1.5px solid #cfe0d5; }
 .welcome .btn:disabled { opacity: .6; }
 .dl-msg { color: #d12f3a; min-height: 1.2em; margin: 0; }
 .dl-sub { margin: 4px 0 0; font-size: 20px; }
 .dl-links { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
-.linklike { background: none; border: 0; padding: 4px 0; color: #0a7a45; font: inherit; cursor: pointer; text-decoration: underline; }
+.linklike { background: none; border: 0; padding: 4px 0; color: var(--wl-a, #0a7a45); font: inherit; cursor: pointer; text-decoration: underline; }
 .linklike.strong { font-weight: 700; }
 
 /* ---- welcome on phones: fills any screen height, sizes scale with it ---- */
@@ -2420,3 +2420,8 @@ body.welcome-mode { background: linear-gradient(160deg, #0a7a45 0%, #0f9d58 55%,
 }
 
 .dl-msg:empty { display: none; }
+
+.wl-swatches { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.wl-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1.5px #cfd8d2; cursor: pointer; padding: 0; }
+.wl-swatch.on { box-shadow: 0 0 0 2.5px #15231b; }
+.wl-custom { width: 28px; height: 28px; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }

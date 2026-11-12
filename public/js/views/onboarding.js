@@ -1,5 +1,6 @@
 import { h, icon, toast } from '../ui.js';
-import { addMeter } from '../state.js';
+import { addMeter, updateSettings } from '../state.js';
+import { applyWelcomeColor, colorSwatches } from '../lib/welcomecolor.js';
 import { descoLoginForm } from './descologin.js';
 
 let provider = 'desco';
@@ -102,6 +103,16 @@ export function renderOnboarding(ctx) {
         h('span', {}, icon('shield', { size: 14 }), t('welcome.secure')),
         h('span', {}, icon('check', { size: 14 }), t('welcome.official')),
         h('span', {}, icon('zap', { size: 14 }), t('welcome.realtime')),
+      ),
+      colorSwatches(
+        h,
+        ctx.state.settings.welcomeColor || '',
+        (hex) => {
+          updateSettings({ welcomeColor: hex });
+          applyWelcomeColor(hex);
+          ctx.renderView();
+        },
+        t('settings.colorTitle'),
       ),
     ),
   );
