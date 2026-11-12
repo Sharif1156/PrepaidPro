@@ -2388,3 +2388,21 @@ body.welcome-mode { background: linear-gradient(160deg, #0a7a45 0%, #0f9d58 55%,
 .dl-links { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
 .linklike { background: none; border: 0; padding: 4px 0; color: #0a7a45; font: inherit; cursor: pointer; text-decoration: underline; }
 .linklike.strong { font-weight: 700; }
+
+/* ---- welcome on phones: fit one screen, no scrolling on the sign-in step ---- */
+@media (max-width: 520px) {
+  body.welcome-mode { zoom: 1; }
+  .welcome { padding: 18px 16px 20px; gap: 14px; min-height: 100dvh; align-content: start; }
+  .welcome-hero { gap: 8px; }
+  .welcome-logo { width: 34px; height: 34px; border-radius: 10px; }
+  .welcome-hero h1 { margin: 6px 0 0; font-size: 28px; line-height: 1.1; }
+  .welcome-hero > p { display: none; }
+  .welcome-card { padding: 16px; gap: 10px; border-radius: 22px; }
+  .welcome-tab { padding: 9px; }
+  .welcome-h { font-size: 18px; margin: 2px 0 0; }
+  .welcome-card .welcome-body > p.muted { display: none; }
+  .welcome .input { padding: 12px 14px; }
+  .welcome-card form.stack { gap: 10px; }
+  .welcome-card form .small.muted { display: none; }
+  .welcome-trust { display: none; }
+}
