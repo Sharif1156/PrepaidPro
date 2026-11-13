@@ -23,6 +23,8 @@ const defaultSettings = {
   logo: '',
   // Base colour of the sign-in screen ('' = the default green).
   welcomeColor: '',
+  // 'list' (full detail) or 'grid' (compact tiles) on the My meters page.
+  metersView: 'list',
 };
 
 const listeners = new Set();
@@ -59,6 +61,7 @@ function load() {
     const settings = { ...defaultSettings, ...(raw?.settings || {}) };
     if (!settings.descoProfiles || typeof settings.descoProfiles !== 'object' || Array.isArray(settings.descoProfiles)) settings.descoProfiles = {};
     if (!settings.alarms || typeof settings.alarms !== 'object' || Array.isArray(settings.alarms)) settings.alarms = {};
+    if (!['list', 'grid'].includes(settings.metersView)) settings.metersView = 'list';
     if (!/^#[0-9a-f]{6}$/i.test(settings.welcomeColor || '')) settings.welcomeColor = '';
     if (typeof settings.logo !== 'string' || !settings.logo.startsWith('data:image/') || settings.logo.length > 80_000) settings.logo = '';
     if (!['en', 'bn'].includes(settings.lang)) settings.lang = 'en';
@@ -130,7 +133,11 @@ export function addMeter({ provider, accountNo, label = '', threshold = null, de
     return existing;
   }
   const meter = sanitizeMeter({ provider, accountNo: clean, label, threshold, demo, id: uid() });
-  setState({ meters: [...state.meters, meter], activeMeterId: meter.id });
+  let settings = state.settings;
+  if (provider === 'desco' && !demo && (meter.label || meter.threshold !== null)) {
+    settings = { ...state.settings, descoProfiles: { ...(state.settings.descoProfiles || {}), [clean]: { label: meter.label || '', threshold: meter.threshold ?? null } } };
+  }
+  setState({ meters: [...state.meters, meter], activeMeterId: meter.id, settings });
   return meter;
 }
 
@@ -158,9 +165,19 @@ export function updateSettings(patch) {
 }
 
 export function updateMeter(id, patch) {
-  setState({
-    meters: state.meters.map((meter) => (meter.id === id ? { ...meter, ...patch } : meter)),
-  });
+  const before = state.meters.find((meter) => meter.id === id);
+  const meters = state.meters.map((meter) => (meter.id === id ? { ...meter, ...patch } : meter));
+  let settings = state.settings;
+  // Also remember the name/limit right away, keyed by account number, so a DESCO
+  // meter renamed on this device still shows that name after a sign-out/sign-in,
+  // even if the person never explicitly signs out through the app.
+  if (before && before.provider === 'desco' && !before.demo && ('label' in patch || 'threshold' in patch)) {
+    const after = meters.find((meter) => meter.id === id);
+    const descoProfiles = { ...(state.settings.descoProfiles || {}) };
+    descoProfiles[before.accountNo] = { label: after.label || '', threshold: after.threshold ?? null };
+    settings = { ...state.settings, descoProfiles };
+  }
+  setState({ meters, settings });
 }
 
 export function snapshotKey(meter) {

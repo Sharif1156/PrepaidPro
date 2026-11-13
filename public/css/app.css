@@ -319,7 +319,15 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  margin-right: -2px;
 }
+.side-nav::-webkit-scrollbar { width: 4px; }
+.side-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 .side-nav .nav-label {
   padding: 8px 12px 6px;
@@ -1736,7 +1744,9 @@ body.drawer-open { overflow: hidden; }
     box-shadow: var(--shadow-lg);
     /* Above .scrim (90) and .tabbar (40): the open menu must be sharp and tappable. */
     z-index: 95;
-    overflow-y: auto;
+    /* The menu itself never scrolls: only the meter list inside .side-nav does,
+       so the brand header and the footer (sign-out, logo, GitHub link) stay put. */
+    overflow: hidden;
     overscroll-behavior: contain;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -2336,6 +2346,11 @@ body.welcome-mode { background:
 @media (max-width: 520px) {
   body { zoom: 1.15; }
   .toasts { right: 12px; left: 12px; max-width: none; }
+  /* Counter the body zoom just for the menu drawer: at 1.15x a 100vh-tall drawer
+     renders taller than the real screen and pushes its footer past the bottom
+     edge. Un-zooming it keeps the whole drawer (including Sign out / logo /
+     GitHub link) visible without needing to scroll past the meter list. */
+  .sidebar { zoom: 0.8696; }
 }
 
 /* year-on-year chart and clickable list rows */
@@ -2425,3 +2440,49 @@ body.welcome-mode { background: linear-gradient(160deg, var(--wl-a, #0a7a45) 0%,
 .wl-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1.5px #cfd8d2; cursor: pointer; padding: 0; }
 .wl-swatch.on { box-shadow: 0 0 0 2.5px #15231b; }
 .wl-custom { width: 28px; height: 28px; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+
+/* --------------------------- meters: grid layout -------------------------- */
+.view-toggle button { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.meter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 10px;
+}
+.meter-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 12px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.meter-tile:active { transform: scale(0.98); }
+.meter-tile.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.meter-tile.dashed {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  color: var(--muted);
+  background: transparent;
+  min-height: 112px;
+  gap: 6px;
+}
+.meter-tile-dot { width: 7px; height: 7px; border-radius: 50%; margin-bottom: 2px; }
+.meter-tile-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 16px; }
+.meter-tile-balance { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.meter-tile-days { font-size: 11px; color: var(--muted); }
+.meter-tile-active { position: absolute; bottom: 10px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.meter-tile-edit {
+  position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border);
+}
+@media (max-width: 520px) {
+  .meter-grid { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+  .meter-tile { padding: 11px 10px 10px; border-radius: 14px; }
+  .meter-tile-balance { font-size: 15px; }
+}

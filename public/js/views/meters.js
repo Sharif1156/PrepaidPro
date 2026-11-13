@@ -1,5 +1,5 @@
 import { h, icon, openModal, closeModal, toast, stat } from '../ui.js';
-import { addMeter, updateMeter } from '../state.js';
+import { addMeter, updateMeter, updateSettings } from '../state.js';
 import { formatMoney, formatDuration, formatTimeAgo, formatNumber } from '../format.js';
 import { forecastBalance } from '../lib/forecast.js';
 import { sparkline } from '../charts.js';
@@ -368,6 +368,49 @@ function openThresholdModal(ctx, meter) {
   });
 }
 
+function compactMeterCard(ctx, meter) {
+  const { t, lang } = ctx;
+  const summary = ctx.summaries[meter.id];
+  const account = summary?.account || (ctx.meter?.id === meter.id ? ctx.account : null);
+  const threshold = meter.threshold ?? ctx.state.settings.threshold;
+  const forecast = account ? forecastBalance(account, { threshold }) : null;
+  const isActive = ctx.state.activeMeterId === meter.id;
+  const balance = account?.balance;
+
+  const open = () => {
+    ctx.setActiveMeter(meter.id);
+    ctx.go('dashboard');
+    ctx.loadActive();
+  };
+
+  return h(
+    'article',
+    { class: `meter-tile ${isActive ? 'active' : ''}`, role: 'button', tabindex: '0', onclick: open, onkeydown: (event) => { if (event.key === 'Enter') open(); } },
+    h(
+      'button',
+      {
+        class: 'meter-tile-edit',
+        type: 'button',
+        'aria-label': t('meters.edit'),
+        onclick: (event) => { event.stopPropagation(); openEditMeterModal(ctx, meter); },
+      },
+      icon('pencil', { size: 12 }),
+    ),
+    h(
+      'span',
+      { class: 'meter-tile-dot', style: { background: meter.provider === 'desco' ? 'var(--accent)' : 'var(--violet)' } },
+    ),
+    h('p', { class: 'meter-tile-name' }, meter.label || `${meter.provider.toUpperCase()} ${meter.accountNo}`),
+    h('p', { class: 'meter-tile-balance' }, balance === null || balance === undefined ? '--' : formatMoney(balance, lang)),
+    h(
+      'p',
+      { class: 'meter-tile-days' },
+      forecast?.daysLeft ? `${formatDuration(forecast.daysLeft, lang)} ${t('meters.left') || ''}`.trim() : t('common.unknown'),
+    ),
+    isActive ? h('span', { class: 'meter-tile-active' }, t('meters.active')) : null,
+  );
+}
+
 function emptyState(ctx) {
   const { t } = ctx;
   return h(
@@ -393,6 +436,28 @@ export function renderMeters(ctx) {
   const { t, lang, state } = ctx;
   const meters = state.meters;
   if (!meters.length) return emptyState(ctx);
+
+  const view = state.settings.metersView === 'grid' ? 'grid' : 'list';
+  const setView = (next) => {
+    updateSettings({ metersView: next });
+    ctx.renderView();
+  };
+  const viewToggle = h(
+    'div',
+    { class: 'segmented view-toggle', role: 'group', 'aria-label': t('meters.viewLabel') },
+    h(
+      'button',
+      { type: 'button', 'aria-pressed': String(view === 'list'), onclick: () => setView('list') },
+      icon('rows', { size: 14 }),
+      t('meters.viewList'),
+    ),
+    h(
+      'button',
+      { type: 'button', 'aria-pressed': String(view === 'grid'), onclick: () => setView('grid') },
+      icon('grid', { size: 14 }),
+      t('meters.viewGrid'),
+    ),
+  );
 
   const signature = meters.map((meter) => meter.id).join(',');
   if (summariesRequested !== signature) {
@@ -464,30 +529,43 @@ export function renderMeters(ctx) {
         ),
       ),
     ),
-    h(
-      'div',
-      { class: 'grid cols-3' },
-      ...meters.map((meter) => meterCard(ctx, meter)),
-      h(
-        'button',
-        {
-          class: 'meter-card',
-          type: 'button',
-          style: {
-            borderStyle: 'dashed',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '196px',
-            color: 'var(--muted)',
-            background: 'transparent',
-            cursor: 'pointer',
-          },
-          onclick: () => openAddMeterModal(ctx),
-        },
-        icon('plus', { size: 22 }),
-        h('span', { class: 'small' }, t('meters.addTitle')),
-      ),
-    ),
+    h('div', { class: 'row', style: { justifyContent: 'flex-end' } }, viewToggle),
+    view === 'grid'
+      ? h(
+          'div',
+          { class: 'meter-grid' },
+          ...meters.map((meter) => compactMeterCard(ctx, meter)),
+          h(
+            'button',
+            { class: 'meter-tile dashed', type: 'button', onclick: () => openAddMeterModal(ctx) },
+            icon('plus', { size: 20 }),
+            h('span', { class: 'small' }, t('meters.addTitle')),
+          ),
+        )
+      : h(
+          'div',
+          { class: 'grid cols-3' },
+          ...meters.map((meter) => meterCard(ctx, meter)),
+          h(
+            'button',
+            {
+              class: 'meter-card',
+              type: 'button',
+              style: {
+                borderStyle: 'dashed',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '196px',
+                color: 'var(--muted)',
+                background: 'transparent',
+                cursor: 'pointer',
+              },
+              onclick: () => openAddMeterModal(ctx),
+            },
+            icon('plus', { size: 22 }),
+            h('span', { class: 'small' }, t('meters.addTitle')),
+          ),
+        ),
   );
 }
 
