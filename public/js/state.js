@@ -160,6 +160,15 @@ export function setActiveMeter(id) {
   setState({ activeMeterId: id });
 }
 
+/** Put the meters in this exact order (a drag-to-reorder on My meters). Unknown ids are ignored; any meter missing from `order` keeps its place at the end. */
+export function reorderMeters(order) {
+  const byId = new Map(state.meters.map((meter) => [meter.id, meter]));
+  const reordered = order.map((id) => byId.get(id)).filter(Boolean);
+  for (const meter of state.meters) if (!order.includes(meter.id)) reordered.push(meter);
+  if (reordered.length !== state.meters.length) return; // something didn't match; leave the order alone
+  setState({ meters: reordered });
+}
+
 export function updateSettings(patch) {
   setState({ settings: { ...state.settings, ...patch } });
 }

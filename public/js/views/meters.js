@@ -1,5 +1,6 @@
 import { h, icon, openModal, closeModal, toast, stat } from '../ui.js';
-import { addMeter, updateMeter, updateSettings } from '../state.js';
+import { addMeter, updateMeter, updateSettings, reorderMeters } from '../state.js';
+import { enableReorder } from '../lib/reorder.js';
 import { formatMoney, formatDuration, formatTimeAgo, formatNumber } from '../format.js';
 import { forecastBalance } from '../lib/forecast.js';
 import { sparkline } from '../charts.js';
@@ -183,20 +184,25 @@ function meterCard(ctx, meter) {
 
   return h(
     'article',
-    { class: `meter-card ${isActive ? 'active' : ''}` },
+    { class: `meter-card ${isActive ? 'active' : ''}`, dataset: { id: meter.id } },
     h(
       'div',
       { class: 'meter-top' },
       h(
         'div',
-        { style: { minWidth: 0 } },
+        { class: 'row', style: { gap: '8px', alignItems: 'flex-start', minWidth: 0 } },
+        h('span', { class: 'meter-grip drag-handle', 'aria-label': t('meters.reorder') }, icon('grip', { size: 15 })),
         h(
-          'p',
-          { class: 'meter-name' },
-          meter.label || `${meter.provider.toUpperCase()} ${t('nav.meters')}`,
-          meter.demo ? h('span', { class: 'badge demo', style: { marginLeft: '8px' } }, t('common.demo')) : null,
+          'div',
+          { style: { minWidth: 0 } },
+          h(
+            'p',
+            { class: 'meter-name' },
+            meter.label || `${meter.provider.toUpperCase()} ${t('nav.meters')}`,
+            meter.demo ? h('span', { class: 'badge demo', style: { marginLeft: '8px' } }, t('common.demo')) : null,
+          ),
+          h('p', { class: 'meter-no' }, `${meter.provider.toUpperCase()} · ${meter.accountNo}`),
         ),
-        h('p', { class: 'meter-no' }, `${meter.provider.toUpperCase()} · ${meter.accountNo}`),
       ),
       isActive ? h('span', { class: 'badge accent' }, t('meters.active')) : null,
     ),
@@ -385,7 +391,8 @@ function compactMeterCard(ctx, meter) {
 
   return h(
     'article',
-    { class: `meter-tile ${isActive ? 'active' : ''}`, role: 'button', tabindex: '0', onclick: open, onkeydown: (event) => { if (event.key === 'Enter') open(); } },
+    { class: `meter-tile ${isActive ? 'active' : ''}`, dataset: { id: meter.id }, role: 'button', tabindex: '0', onclick: open, onkeydown: (event) => { if (event.key === 'Enter') open(); } },
+    h('span', { class: 'meter-tile-grip drag-handle', 'aria-label': t('meters.reorder'), onclick: (event) => event.stopPropagation() }, icon('grip', { size: 13 })),
     h(
       'button',
       {
@@ -407,7 +414,9 @@ function compactMeterCard(ctx, meter) {
       { class: 'meter-tile-days' },
       forecast?.daysLeft ? `${formatDuration(forecast.daysLeft, lang)} ${t('meters.left') || ''}`.trim() : t('common.unknown'),
     ),
-    isActive ? h('span', { class: 'meter-tile-active' }, t('meters.active')) : null,
+    isActive
+      ? h('span', { class: 'meter-tile-active' }, h('span', { class: 'sr-only' }, t('meters.active')))
+      : null,
   );
 }
 
@@ -531,41 +540,51 @@ export function renderMeters(ctx) {
     ),
     h('div', { class: 'row', style: { justifyContent: 'flex-end' } }, viewToggle),
     view === 'grid'
-      ? h(
-          'div',
-          { class: 'meter-grid' },
-          ...meters.map((meter) => compactMeterCard(ctx, meter)),
+      ? reorderable(
           h(
-            'button',
-            { class: 'meter-tile dashed', type: 'button', onclick: () => openAddMeterModal(ctx) },
-            icon('plus', { size: 20 }),
-            h('span', { class: 'small' }, t('meters.addTitle')),
+            'div',
+            { class: 'meter-grid' },
+            ...meters.map((meter) => compactMeterCard(ctx, meter)),
+            h(
+              'button',
+              { class: 'meter-tile dashed', type: 'button', onclick: () => openAddMeterModal(ctx) },
+              icon('plus', { size: 20 }),
+              h('span', { class: 'small' }, t('meters.addTitle')),
+            ),
           ),
         )
-      : h(
-          'div',
-          { class: 'grid cols-3' },
-          ...meters.map((meter) => meterCard(ctx, meter)),
+      : reorderable(
           h(
-            'button',
-            {
-              class: 'meter-card',
-              type: 'button',
-              style: {
-                borderStyle: 'dashed',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '196px',
-                color: 'var(--muted)',
-                background: 'transparent',
-                cursor: 'pointer',
+            'div',
+            { class: 'grid cols-3' },
+            ...meters.map((meter) => meterCard(ctx, meter)),
+            h(
+              'button',
+              {
+                class: 'meter-card',
+                type: 'button',
+                style: {
+                  borderStyle: 'dashed',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '196px',
+                  color: 'var(--muted)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                },
+                onclick: () => openAddMeterModal(ctx),
               },
-              onclick: () => openAddMeterModal(ctx),
-            },
-            icon('plus', { size: 22 }),
-            h('span', { class: 'small' }, t('meters.addTitle')),
+              icon('plus', { size: 22 }),
+              h('span', { class: 'small' }, t('meters.addTitle')),
+            ),
           ),
         ),
   );
+
+  /** Let the person drag a card (by its grip handle) to set the order meters are saved and shown in. */
+  function reorderable(container) {
+    enableReorder(container, (ids) => reorderMeters(ids));
+    return container;
+  }
 }
 

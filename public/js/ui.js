@@ -42,6 +42,7 @@ export function mount(container, ...children) {
 const ICONS = {
   grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
   rows: '<rect x="3" y="4" width="18" height="4" rx="1.3"/><rect x="3" y="10" width="18" height="4" rx="1.3"/><rect x="3" y="16" width="18" height="4" rx="1.3"/>',
+  grip: '<g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="18" r="1.5"/></g>',
   meter: '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7h8M8 11h3M8 15h5"/><circle cx="16" cy="16" r="2"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   sparkles:

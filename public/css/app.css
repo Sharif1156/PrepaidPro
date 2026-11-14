@@ -2453,7 +2453,7 @@ body.welcome-mode { background: linear-gradient(160deg, var(--wl-a, #0a7a45) 0%,
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 13px 12px 12px;
+  padding: 32px 12px 12px;
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -2483,6 +2483,19 @@ body.welcome-mode { background: linear-gradient(160deg, var(--wl-a, #0a7a45) 0%,
 }
 @media (max-width: 520px) {
   .meter-grid { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
-  .meter-tile { padding: 11px 10px 10px; border-radius: 14px; }
+  .meter-tile { padding: 30px 10px 10px; border-radius: 14px; }
   .meter-tile-balance { font-size: 15px; }
+}
+
+/* ------------------------- meters: drag to reorder ------------------------ */
+.drag-handle { touch-action: none; cursor: grab; }
+.meter-grid.reordering, .grid.cols-3.reordering { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+.meter-tile.dragging, .meter-card.dragging { opacity: 0.5; }
+.meter-tile-grip {
+  position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border);
+}
+.meter-grip {
+  flex-shrink: 0; width: 28px; height: 28px; margin-top: 2px; border-radius: 8px;
+  display: grid; place-items: center; color: var(--muted); cursor: grab;
 }
