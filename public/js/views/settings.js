@@ -1,4 +1,4 @@
-import { customToneName, saveCustomTone, clearCustomTone } from '../lib/alarm.js';
+import { customToneName, saveCustomTone, clearCustomTone, ALARM_PRESETS } from '../lib/alarm.js';
 import { h, icon, card, openModal, closeModal, toast, download } from '../ui.js';
 import { updateSettings, clearAll, exportAll, importAll } from '../state.js';
 import { formatMoney, formatDate } from '../format.js';
@@ -233,8 +233,9 @@ export function renderSettings(ctx) {
       if (!file) return;
       try {
         await saveCustomTone(file);
+        updateSettings({ alarmTone: 'custom' });
         toast(t('settings.toneSaved'), file.name);
-        ctx.testAlarm();
+        ctx.testAlarm('custom');
         ctx.renderView();
       } catch {
         toast(t('settings.toneFailed'), t('settings.toneFailedHelp'), { type: 'error', timeout: 7000 });
@@ -343,10 +344,69 @@ export function renderSettings(ctx) {
           toneInput,
           h('button', { class: 'btn sm', type: 'button', onclick: () => toneInput.click() }, t('settings.toneChoose')),
           toneName
-            ? h('button', { class: 'btn sm', type: 'button', onclick: () => { clearCustomTone(); toast(t('settings.toneRemoved')); ctx.renderView(); } }, t('settings.toneRemove'))
+            ? h('button', { class: 'btn sm', type: 'button', onclick: () => {
+                clearCustomTone();
+                if (settings.alarmTone === 'custom') updateSettings({ alarmTone: 'siren' });
+                toast(t('settings.toneRemoved'));
+                ctx.renderView();
+              } }, t('settings.toneRemove'))
             : null,
         ),
       }),
+      h(
+        'div',
+        { class: 'tone-list', role: 'radiogroup', 'aria-label': t('settings.tonePick') },
+        ...ALARM_PRESETS.map((preset) =>
+          h(
+            'div',
+            { class: `tone-row ${settings.alarmTone === preset.id ? 'on' : ''}` },
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'tone-name',
+                role: 'radio',
+                'aria-checked': String(settings.alarmTone === preset.id),
+                onclick: () => {
+                  updateSettings({ alarmTone: preset.id });
+                  ctx.testAlarm(preset.id);
+                  ctx.renderView();
+                },
+              },
+              h('span', { class: 'tone-dot' }),
+              t(preset.nameKey),
+            ),
+            h(
+              'button',
+              { type: 'button', class: 'tone-preview', 'aria-label': t('settings.tonePreview'), onclick: () => ctx.testAlarm(preset.id) },
+              icon('play', { size: 14 }),
+            ),
+          ),
+        ),
+        h(
+          'div',
+          { class: `tone-row ${settings.alarmTone === 'custom' ? 'on' : ''}` },
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'tone-name',
+              role: 'radio',
+              'aria-checked': String(settings.alarmTone === 'custom'),
+              disabled: !toneName,
+              onclick: () => {
+                if (!toneName) return;
+                updateSettings({ alarmTone: 'custom' });
+                ctx.testAlarm('custom');
+                ctx.renderView();
+              },
+            },
+            h('span', { class: 'tone-dot' }),
+            toneName ? t('settings.toneCurrent', { name: toneName }) : t('settings.toneCustomDesc'),
+          ),
+          toneName ? h('button', { type: 'button', class: 'tone-preview', 'aria-label': t('settings.tonePreview'), onclick: () => ctx.testAlarm('custom') }, icon('play', { size: 14 })) : null,
+        ),
+      ),
       activeAlarms,
     ),
     footer: h(

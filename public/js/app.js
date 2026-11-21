@@ -561,15 +561,45 @@ async function loadAllSummaries() {
 
 /* ------------------------------- notifications ---------------------------- */
 
+/**
+ * Inside the Android app (Capacitor), the web `Notification` API mostly does
+ * nothing: Android's WebView doesn't show a real system notification for it.
+ * When the native LocalNotifications plugin has been added to the app, use
+ * that instead — it talks to Android directly, so it actually appears, even
+ * with the app minimised. See docs/android-notifications.md for how to add it.
+ */
+function nativeNotifier() {
+  const capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
+  return capacitor?.isNativePlatform?.() ? capacitor.Plugins?.LocalNotifications || null : null;
+}
+
 function notificationSupported() {
-  return typeof window !== 'undefined' && 'Notification' in window;
+  return Boolean(nativeNotifier()) || (typeof window !== 'undefined' && 'Notification' in window);
 }
 
 /**
- * Show a notification. `new Notification()` throws on Android Chrome and inside
- * installed apps; a service worker registration works everywhere, so use it first.
+ * Show a notification. Prefers the native plugin inside the app; otherwise a
+ * service worker registration (works even though `new Notification()` throws
+ * on Android Chrome), falling back to the constructor itself.
  */
-async function showNotification(title, options) {
+async function showNotification(title, options = {}) {
+  const native = nativeNotifier();
+  if (native) {
+    try {
+      await native.schedule({
+        notifications: [
+          {
+            id: Math.floor(Math.random() * 2_000_000_000),
+            title,
+            body: options.body || '',
+          },
+        ],
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     const registration = await navigator.serviceWorker?.getRegistration();
     if (registration?.showNotification) {
@@ -588,6 +618,25 @@ async function showNotification(title, options) {
 }
 
 async function requestNotifications() {
+  const native = nativeNotifier();
+  if (native) {
+    try {
+      const result = await native.requestPermissions();
+      if (result?.display !== 'granted') {
+        toast(
+          t(result?.display === 'denied' ? 'settings.notificationsDenied' : 'alerts.permissionDenied'),
+          result?.display === 'denied' ? t('settings.notificationsDeniedHelp') : '',
+          { type: 'warn', timeout: 8000 },
+        );
+        return false;
+      }
+      toast(t('settings.notificationsOn'), '');
+      return true;
+    } catch {
+      toast(t('settings.notificationsUnsupported'), '', { type: 'warn' });
+      return false;
+    }
+  }
   if (!notificationSupported()) {
     toast(t('settings.notificationsUnsupported'), '', { type: 'warn' });
     return false;
@@ -618,7 +667,8 @@ async function requestNotifications() {
 }
 
 async function sendTestNotification() {
-  if (!notificationSupported() || Notification.permission !== 'granted') {
+  const native = nativeNotifier();
+  if (!native && (!notificationSupported() || Notification.permission !== 'granted')) {
     toast(t('settings.notificationsDenied'), t('settings.notificationsDeniedHelp'), { type: 'warn', timeout: 8000 });
     return false;
   }
@@ -653,7 +703,7 @@ function fireReminder(meter, account, count) {
     amount: formatMoney(account.balance, state.settings.lang),
     days: formatDuration(forecast.daysLeft, state.settings.lang),
   });
-  const heard = state.settings.alarmSound ? playAlarm() : false;
+  const heard = state.settings.alarmSound ? playAlarm({ tone: state.settings.alarmTone }) : false;
   toast(title, body, { type: 'warn', timeout: 9000 });
   if (notificationSupported() && Notification.permission === 'granted') {
     showNotification(title, {
@@ -734,9 +784,10 @@ function stopAlarm(meterId) {
   renderView();
 }
 
-function testAlarm() {
+/** Plays the current (or, for a preset preview, a given) warning tone once. */
+function testAlarm(tone) {
   unlockAudio();
-  const heard = playAlarm();
+  const heard = playAlarm({ tone: tone || state.settings.alarmTone });
   if (!heard) toast(t('settings.alarmBlocked'), '', { type: 'warn' });
   return heard;
 }

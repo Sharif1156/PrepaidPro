@@ -66,40 +66,103 @@ export function unlockAudio() {
 }
 
 /**
- * A two-tone "siren" warning: high-low-high-low, twice, about 2.5 seconds.
- * Generated in code, so there is no audio file to download.
- * Returns true when the browser let it play.
+ * Built-in warning tones, generated in code so there is no audio file to
+ * download. Each is a few short bursts of beeps ("groups"), with a pause
+ * between groups. `wave` is the oscillator shape, `beep`/`gap` the length
+ * of one note and the silence after it, both in seconds.
  */
-export function playAlarm({ volume = 0.35 } = {}) {
-  if (playCustom()) return true;
+export const ALARM_PRESETS = [
+  {
+    id: 'siren',
+    nameKey: 'settings.toneSiren',
+    wave: 'square',
+    beep: 0.28,
+    gap: 0.04,
+    pause: 0.25,
+    groups: [
+      [980, 700, 980, 700],
+      [980, 700, 980, 700],
+    ],
+  },
+  {
+    id: 'fire',
+    nameKey: 'settings.toneFire',
+    wave: 'square',
+    beep: 0.09,
+    gap: 0.08,
+    pause: 0,
+    groups: [Array(14).fill(3100)],
+  },
+  {
+    id: 'digital',
+    nameKey: 'settings.toneDigital',
+    wave: 'sine',
+    beep: 0.11,
+    gap: 0.05,
+    pause: 0.3,
+    groups: [
+      [1300, 1300, 1300],
+      [1700, 1700, 1700],
+    ],
+  },
+  {
+    id: 'chime',
+    nameKey: 'settings.toneChime',
+    wave: 'sine',
+    beep: 0.32,
+    gap: 0.06,
+    pause: 0.35,
+    groups: [
+      [660, 880],
+      [660, 880],
+    ],
+  },
+];
+
+function playPreset(preset, volume) {
   const ctx = context();
   if (!ctx) return false;
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   if (ctx.state !== 'running') return false;
 
-  const start = ctx.currentTime + 0.05;
-  const beep = 0.28;
-  const pattern = [980, 700, 980, 700, 980, 700, 980, 700];
-  pattern.forEach((frequency, index) => {
-    const at = start + index * (beep + 0.04) + (index >= 4 ? 0.25 : 0);
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(frequency, at);
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(volume * 0.5, at + 0.02);
-    gain.gain.setValueAtTime(volume * 0.5, at + beep - 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + beep);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(at);
-    osc.stop(at + beep + 0.02);
-  });
+  let at = ctx.currentTime + 0.05;
+  for (const group of preset.groups) {
+    for (const frequency of group) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = preset.wave;
+      osc.frequency.setValueAtTime(frequency, at);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(volume * 0.5, at + Math.min(0.02, preset.beep / 4));
+      gain.gain.setValueAtTime(volume * 0.5, at + preset.beep - Math.min(0.04, preset.beep / 4));
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + preset.beep);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(at);
+      osc.stop(at + preset.beep + 0.02);
+      at += preset.beep + preset.gap;
+    }
+    at += preset.pause;
+  }
   try {
     navigator.vibrate?.([250, 120, 250, 120, 500]);
   } catch {
     /* not supported */
   }
   return true;
+}
+
+/**
+ * Plays the chosen warning tone ('siren' by default, or one of the other
+ * ALARM_PRESETS ids, or 'custom' for the person's own uploaded sound).
+ * Returns true when the browser let it play.
+ */
+export function playAlarm({ volume = 0.35, tone = 'siren' } = {}) {
+  if (tone === 'custom') {
+    if (playCustom()) return true;
+    tone = 'siren'; // no custom tone saved (or it failed): use the default
+  }
+  const preset = ALARM_PRESETS.find((item) => item.id === tone) || ALARM_PRESETS[0];
+  return playPreset(preset, volume);
 }
 
 /* ---------------------------- the person's own tone ---------------------------- */
