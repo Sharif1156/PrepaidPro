@@ -672,12 +672,15 @@ async function sendTestNotification() {
     toast(t('settings.notificationsDenied'), t('settings.notificationsDeniedHelp'), { type: 'warn', timeout: 8000 });
     return false;
   }
-  // Matches fireReminder(): the notification itself is always in Bangla.
-  const ok = await showNotification(t('settings.notificationTestTitle', {}, 'bn'), {
-    body: t('settings.notificationTestBody', {}, 'bn'),
-    icon: '/icons/icon-192.png',
-    tag: 'prepaidpro-test',
-  });
+  // Matches fireReminder(): the notification itself always shows both languages.
+  const ok = await showNotification(
+    `${t('settings.notificationTestTitle', {}, 'bn')} / ${t('settings.notificationTestTitle', {}, 'en')}`,
+    {
+      body: `${t('settings.notificationTestBody', {}, 'bn')}\n${t('settings.notificationTestBody', {}, 'en')}`,
+      icon: '/icons/icon-192.png',
+      tag: 'prepaidpro-test',
+    },
+  );
   if (!ok) toast(t('settings.notificationsUnsupported'), '', { type: 'warn' });
   return ok;
 }
@@ -704,20 +707,21 @@ function fireReminder(meter, account, count) {
     amount: formatMoney(account.balance, state.settings.lang),
     days: formatDuration(forecast.daysLeft, state.settings.lang),
   });
-  // The phone notification itself always reads in Bangla, whatever language
-  // the app's own screens are set to — the person asked for this directly.
-  const notifyLang = 'bn';
-  const notifyTitle = t(critical ? 'alerts.critical.title' : 'alerts.lowBalance.title', {}, notifyLang);
-  const notifyBody = t(critical ? 'alerts.critical.body' : 'alerts.lowBalance.body', {
-    meter: meterName(meter),
-    amount: formatMoney(account.balance, notifyLang),
-    days: formatDuration(forecast.daysLeft, notifyLang),
-  }, notifyLang);
+  // The phone notification always shows both languages together (Bangla
+  // first), whatever language the app's own screens are set to.
+  const notifyTitle = `${t(critical ? 'alerts.critical.title' : 'alerts.lowBalance.title', {}, 'bn')} / ${t(critical ? 'alerts.critical.title' : 'alerts.lowBalance.title', {}, 'en')}`;
+  const bodyIn = (lang) =>
+    t(critical ? 'alerts.critical.body' : 'alerts.lowBalance.body', {
+      meter: meterName(meter),
+      amount: formatMoney(account.balance, lang),
+      days: formatDuration(forecast.daysLeft, lang),
+    }, lang);
+  const notifyBody = `${bodyIn('bn')}\n${bodyIn('en')}`;
   const heard = state.settings.alarmSound ? playAlarm({ tone: state.settings.alarmTone }) : false;
   toast(title, body, { type: 'warn', timeout: 9000 });
   if (notificationSupported() && Notification.permission === 'granted') {
     showNotification(notifyTitle, {
-      body: count > 1 ? `${notifyBody} (${t('alerts.reminderNumber', { n: count }, notifyLang)})` : notifyBody,
+      body: count > 1 ? `${notifyBody} (${t('alerts.reminderNumber', { n: count }, 'bn')} / ${t('alerts.reminderNumber', { n: count }, 'en')})` : notifyBody,
       icon: '/icons/icon-192.png',
       badge: '/icons/favicon-32.png',
       tag: `prepaidpro-${meter.id}`,
