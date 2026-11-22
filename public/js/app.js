@@ -672,8 +672,9 @@ async function sendTestNotification() {
     toast(t('settings.notificationsDenied'), t('settings.notificationsDeniedHelp'), { type: 'warn', timeout: 8000 });
     return false;
   }
-  const ok = await showNotification(t('settings.notificationTestTitle'), {
-    body: t('settings.notificationTestBody'),
+  // Matches fireReminder(): the notification itself is always in Bangla.
+  const ok = await showNotification(t('settings.notificationTestTitle', {}, 'bn'), {
+    body: t('settings.notificationTestBody', {}, 'bn'),
     icon: '/icons/icon-192.png',
     tag: 'prepaidpro-test',
   });
@@ -703,11 +704,20 @@ function fireReminder(meter, account, count) {
     amount: formatMoney(account.balance, state.settings.lang),
     days: formatDuration(forecast.daysLeft, state.settings.lang),
   });
+  // The phone notification itself always reads in Bangla, whatever language
+  // the app's own screens are set to — the person asked for this directly.
+  const notifyLang = 'bn';
+  const notifyTitle = t(critical ? 'alerts.critical.title' : 'alerts.lowBalance.title', {}, notifyLang);
+  const notifyBody = t(critical ? 'alerts.critical.body' : 'alerts.lowBalance.body', {
+    meter: meterName(meter),
+    amount: formatMoney(account.balance, notifyLang),
+    days: formatDuration(forecast.daysLeft, notifyLang),
+  }, notifyLang);
   const heard = state.settings.alarmSound ? playAlarm({ tone: state.settings.alarmTone }) : false;
   toast(title, body, { type: 'warn', timeout: 9000 });
   if (notificationSupported() && Notification.permission === 'granted') {
-    showNotification(title, {
-      body: count > 1 ? `${body} (${t('alerts.reminderNumber', { n: count })})` : body,
+    showNotification(notifyTitle, {
+      body: count > 1 ? `${notifyBody} (${t('alerts.reminderNumber', { n: count }, notifyLang)})` : notifyBody,
       icon: '/icons/icon-192.png',
       badge: '/icons/favicon-32.png',
       tag: `prepaidpro-${meter.id}`,
